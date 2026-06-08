@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, History, User, ShieldCheck, LogOut } from 'lucide-react'
+import { BookOpen, History, User, ShieldCheck, LogOut, Globe, Award } from 'lucide-react'
 
 export default function Layout({ children }) {
   const { profile, logout, isPastorAdmin } = useAuth()
@@ -11,6 +11,8 @@ export default function Layout({ children }) {
   const navItems = [
     { path: '/', label: 'Devocional', icon: BookOpen },
     { path: '/archive', label: 'Historial', icon: History },
+    { path: '/misiones', label: 'Misiones', icon: Globe },
+    { path: '/escuela', label: 'Escuela', icon: Award },
     { path: '/profile', label: 'Mi Perfil', icon: User },
   ]
 

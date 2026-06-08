@@ -8,6 +8,8 @@ import Devocional from './pages/Devocional'
 import Archive from './pages/Archive'
 import Profile from './pages/Profile'
 import Admin from './pages/Admin'
+import Misiones from './pages/Misiones'
+import EscuelaLideres from './pages/EscuelaLideres'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading, isPastorAdmin } = useAuth()
@@ -55,6 +57,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <Archive />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/misiones"
+            element={
+              <ProtectedRoute>
+                <Misiones />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/escuela"
+            element={
+              <ProtectedRoute>
+                <EscuelaLideres />
               </ProtectedRoute>
             }
           />

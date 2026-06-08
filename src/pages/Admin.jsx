@@ -140,13 +140,14 @@ export default function Admin() {
     setSuccessMessage('')
 
     try {
-      // 1. Actualizar perfil básico (Rol, célula, ministerio)
+      // 1. Actualizar perfil básico (Rol, célula, ministerio, mentor)
       const { error: profErr } = await supabase
         .from('profiles')
         .update({
           rol: selectedUser.rol,
           celula_id: selectedUser.celula_id || null,
-          ministerio_id: selectedUser.ministerio_id || null
+          ministerio_id: selectedUser.ministerio_id || null,
+          mentor_id: selectedUser.mentor_id || null
         })
         .eq('id', selectedUser.id)
 
@@ -469,6 +470,27 @@ export default function Admin() {
                       {ministerios.map((m) => (
                         <option key={m.id} value={m.id}>{m.nombre}</option>
                       ))}
+                    </select>
+                  </div>
+
+                  {/* Asignar Mentor */}
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">
+                      Asignar Mentor Espiritual
+                    </label>
+                    <select
+                      value={selectedUser.mentor_id || ''}
+                      onChange={(e) => setSelectedUser({ ...selectedUser, mentor_id: e.target.value || null })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2.5 px-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                    >
+                      <option value="">Sin Asignar</option>
+                      {profiles
+                        .filter((p) => (p.rol === 'lider' || p.rol === 'pastor_admin') && p.id !== selectedUser.id)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} ({p.rol === 'pastor_admin' ? 'Pastor' : 'Líder'})
+                          </option>
+                        ))}
                     </select>
                   </div>
 
