@@ -29,17 +29,25 @@ export const AuthProvider = ({ children }) => {
   }
 
   useEffect(() => {
-    // 1. Verificar sesión activa inicial
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        setUser(session.user)
-        await fetchProfile(session.user.id)
-      } else {
+    // 1. Verificar sesión activa inicial de manera segura
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        if (session) {
+          setUser(session.user)
+          await fetchProfile(session.user.id)
+        } else {
+          setUser(null)
+          setProfile(null)
+        }
+      })
+      .catch((err) => {
+        console.error('Error al verificar sesión inicial en Supabase:', err.message)
         setUser(null)
         setProfile(null)
-      }
-      setLoading(false)
-    })
+      })
+      .finally(() => {
+        setLoading(false)
+      })
 
     // 2. Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
