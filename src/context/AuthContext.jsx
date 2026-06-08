@@ -30,20 +30,21 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // 1. Verificar sesión activa inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         setUser(session.user)
-        fetchProfile(session.user.id)
+        await fetchProfile(session.user.id)
       } else {
         setUser(null)
         setProfile(null)
-        setLoading(false)
       }
+      setLoading(false)
     })
 
     // 2. Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        setLoading(true)
         if (session) {
           setUser(session.user)
           await fetchProfile(session.user.id)
@@ -59,13 +60,6 @@ export const AuthProvider = ({ children }) => {
       subscription?.unsubscribe()
     }
   }, [])
-
-  // Dejar de mostrar loading una vez que tenemos el perfil cargado o si no hay sesión
-  useEffect(() => {
-    if (user && profile) {
-      setLoading(false)
-    }
-  }, [user, profile])
 
   const login = async (email, password) => {
     setLoading(true)
