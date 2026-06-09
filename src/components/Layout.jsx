@@ -2,6 +2,7 @@ import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { BookOpen, History, User, ShieldCheck, LogOut, Globe, Award } from 'lucide-react'
+import OnboardingModal from './OnboardingModal'
 
 export default function Layout({ children }) {
   const { profile, logout, isPastorAdmin } = useAuth()
@@ -38,6 +39,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row">
+      <OnboardingModal />
       {/* 1. SIDEBAR (Escritorio) */}
       <aside className="hidden md:flex md:w-64 flex-col bg-slate-900 border-r border-slate-800 shrink-0 sticky top-0 h-screen p-5">
         {/* Header Logo */}
