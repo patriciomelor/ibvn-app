@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera } from 'lucide-react'
+import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe } from 'lucide-react'
 
 export default function Admin() {
   const { user, isPastorAdmin, moduleVisibility, refreshVisibility } = useAuth()
@@ -61,6 +61,19 @@ export default function Admin() {
   const [sportPlace, setSportPlace] = useState('')
   const [sportLimitSlots, setSportLimitSlots] = useState(10)
   const [editingSportId, setEditingSportId] = useState(null)
+
+  // --- NUEVOS ESTADOS MISIONES ---
+  const [adminMisiones, setAdminMisiones] = useState([])
+  const [adminMisionesPostulaciones, setAdminMisionesPostulaciones] = useState([])
+  const [misionTitulo, setMisionTitulo] = useState('')
+  const [misionDestino, setMisionDestino] = useState('')
+  const [misionInicio, setMisionInicio] = useState('')
+  const [misionFin, setMisionFin] = useState('')
+  const [misionCupos, setMisionCupos] = useState(10)
+  const [misionDesc, setMisionDesc] = useState('')
+  const [misionEstado, setMisionEstado] = useState('abierta')
+  const [editingMisionId, setEditingMisionId] = useState(null)
+  const [viewingMisionId, setViewingMisionId] = useState(null)
 
   const [resources, setResources] = useState([])
   const [recursoTitle, setRecursoTitle] = useState('')
@@ -302,6 +315,122 @@ export default function Admin() {
     }
   }
 
+  const fetchMisionesAdmin = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('misiones')
+        .select('*')
+        .order('fecha_inicio', { ascending: false })
+      if (error) throw error
+      setAdminMisiones(data || [])
+    } catch (err) {
+      console.error('Error fetching misiones admin:', err.message)
+    }
+  }
+
+  const handleSaveMision = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const misionData = {
+        titulo: misionTitulo,
+        destino: misionDestino,
+        fecha_inicio: misionInicio,
+        fecha_fin: misionFin,
+        cupos: parseInt(misionCupos),
+        descripcion: misionDesc,
+        estado: misionEstado
+      }
+
+      if (editingMisionId) {
+        const { error } = await supabase.from('misiones').update(misionData).eq('id', editingMisionId)
+        if (error) throw error
+        setSuccessMessage('Viaje misionero actualizado con éxito')
+      } else {
+        const { error } = await supabase.from('misiones').insert(misionData)
+        if (error) throw error
+        setSuccessMessage('Viaje misionero publicado con éxito')
+      }
+
+      // Reset
+      setMisionTitulo(''); setMisionDestino(''); setMisionInicio(''); setMisionFin('')
+      setMisionCupos(10); setMisionDesc(''); setMisionEstado('abierta'); setEditingMisionId(null)
+      await fetchMisionesAdmin()
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al guardar el viaje misionero.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteMision = async (id) => {
+    if (!window.confirm('¿Seguro que deseas eliminar este viaje misionero y todas sus postulaciones?')) return
+    try {
+      setLoading(true)
+      const { error } = await supabase.from('misiones').delete().eq('id', id)
+      if (error) throw error
+      setSuccessMessage('Viaje eliminado con éxito')
+      await fetchMisionesAdmin()
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al eliminar viaje.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEditMision = (mision) => {
+    setEditingMisionId(mision.id)
+    setMisionTitulo(mision.titulo)
+    setMisionDestino(mision.destino)
+    setMisionInicio(mision.fecha_inicio)
+    setMisionFin(mision.fecha_fin)
+    setMisionCupos(mision.cupos)
+    setMisionDesc(mision.descripcion || '')
+    setMisionEstado(mision.estado)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleViewPostulantes = async (misionId) => {
+    setViewingMisionId(misionId)
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('misiones_postulaciones')
+        .select('*, profiles:user_id(nombre, email, tel)')
+        .eq('mision_id', misionId)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setAdminMisionesPostulaciones(data || [])
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al cargar postulantes.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdatePostulacion = async (postulacionId, newState) => {
+    try {
+      const { error } = await supabase
+        .from('misiones_postulaciones')
+        .update({ estado: newState })
+        .eq('id', postulacionId)
+      if (error) throw error
+      
+      // Update local state
+      setAdminMisionesPostulaciones(prev => 
+        prev.map(p => p.id === postulacionId ? { ...p, estado: newState } : p)
+      )
+    } catch (err) {
+      console.error(err)
+      alert('Error al actualizar el estado de la postulación')
+    }
+  }
+
   // Cargar datos administrativos generales
   const loadAdminData = async () => {
     if (!isPastorAdmin) return
@@ -342,6 +471,9 @@ export default function Admin() {
       if (!alrtsErr) {
         setUnresolvedAlerts(alrts || [])
       }
+
+      await fetchMisionesAdmin()
+
 
     } catch (err) {
       console.error('Error loading admin data:', err.message)
@@ -803,6 +935,17 @@ export default function Admin() {
         >
           <Activity className="w-4 h-4" />
           <span>Métricas y Alertas ({unresolvedAlerts.length})</span>
+        </button>
+        <button
+          onClick={() => { setActiveTab('misiones'); setSelectedUser(null); }}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
+            activeTab === 'misiones'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Viajes Misioneros</span>
         </button>
         <button
           onClick={() => { setActiveTab('deportes'); setSelectedUser(null); }}
@@ -1891,6 +2034,176 @@ export default function Admin() {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5.5: VIAJES MISIONEROS */}
+      {activeTab === 'misiones' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+          {/* Formulario Crear/Editar Misión */}
+          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 h-fit sticky top-6">
+            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
+              <Globe className="w-5 h-5 text-indigo-400" />
+              <span>{editingMisionId ? 'Editar Viaje' : 'Nuevo Viaje Misionero'}</span>
+            </h3>
+            
+            <form onSubmit={handleSaveMision} className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Título del Viaje</label>
+                  <input type="text" required value={misionTitulo} onChange={(e) => setMisionTitulo(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:border-indigo-500" placeholder="Ej: Misión Sur 2026" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Destino</label>
+                  <input type="text" required value={misionDestino} onChange={(e) => setMisionDestino(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:border-indigo-500" placeholder="Ciudad, País" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Inicio</label>
+                    <input type="date" required value={misionInicio} onChange={(e) => setMisionInicio(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Fin</label>
+                    <input type="date" required value={misionFin} onChange={(e) => setMisionFin(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:border-indigo-500" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Cupos</label>
+                    <input type="number" required min="1" value={misionCupos} onChange={(e) => setMisionCupos(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Estado</label>
+                    <select value={misionEstado} onChange={(e) => setMisionEstado(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:border-indigo-500">
+                      <option value="abierta">Abierta</option>
+                      <option value="cerrada">Cerrada</option>
+                      <option value="completada">Completada</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Descripción y Requisitos</label>
+                  <textarea rows="3" required value={misionDesc} onChange={(e) => setMisionDesc(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:border-indigo-500" placeholder="Información del viaje..."></textarea>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                {editingMisionId && (
+                  <button type="button" onClick={() => { setEditingMisionId(null); setMisionTitulo(''); setMisionDesc(''); setMisionDestino(''); setMisionInicio(''); setMisionFin(''); }} className="w-1/3 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium py-2 rounded-xl text-xs">
+                    Cancelar
+                  </button>
+                )}
+                <button type="submit" disabled={loading} className="flex-1 flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-xl transition-all disabled:opacity-50 text-xs shadow-md">
+                  {loading ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>{editingMisionId ? 'Guardar Cambios' : 'Publicar Viaje'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Listado de Misiones y Postulantes */}
+          <div className="lg:col-span-2 space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">Viajes Activos e Históricos</h3>
+            
+            {adminMisiones.length === 0 ? (
+              <div className="glass rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-850">
+                <p className="text-slate-500 text-xs italic">No hay viajes misioneros publicados.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {adminMisiones.map((mision) => (
+                  <div key={mision.id} className="glass rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-850 flex flex-col">
+                    <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800/50 bg-white/50 dark:bg-slate-900/30">
+                      <div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${
+                            mision.estado === 'abierta' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 
+                            mision.estado === 'cerrada' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 
+                            'bg-slate-500/10 text-slate-600 border-slate-500/20'
+                          }`}>{mision.estado}</span>
+                          <span className="text-[10px] text-slate-500 font-semibold">{mision.destino}</span>
+                        </div>
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white">{mision.titulo}</h4>
+                        <p className="text-xs text-slate-500 mt-1">{new Date(mision.fecha_inicio).toLocaleDateString()} al {new Date(mision.fecha_fin).toLocaleDateString()} | {mision.cupos} Cupos</p>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2 shrink-0 w-full sm:w-auto">
+                        <button onClick={() => {
+                          if (viewingMisionId === mision.id) setViewingMisionId(null)
+                          else handleViewPostulantes(mision.id)
+                        }} className="flex-1 sm:flex-none px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition-all flex items-center justify-center space-x-1.5">
+                          <Users className="w-3.5 h-3.5" />
+                          <span>Postulantes</span>
+                        </button>
+                        <button onClick={() => handleEditMision(mision)} className="p-1.5 text-indigo-400 hover:bg-indigo-950/40 border border-indigo-500/10 rounded-lg transition-all" title="Editar">
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleDeleteMision(mision.id)} className="p-1.5 text-rose-400 hover:bg-rose-950/40 border border-rose-500/10 rounded-lg transition-all" title="Eliminar">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Postulantes Panel (Si está expandido) */}
+                    {viewingMisionId === mision.id && (
+                      <div className="p-5 bg-slate-50 dark:bg-slate-900/60">
+                        <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center justify-between">
+                          <span>Lista de Postulantes ({adminMisionesPostulaciones.length})</span>
+                          <span className="text-indigo-500">Misión: {mision.titulo}</span>
+                        </h5>
+                        
+                        {loading && <div className="py-4 text-center"><Loader className="w-4 h-4 animate-spin text-indigo-500 mx-auto" /></div>}
+                        
+                        {!loading && adminMisionesPostulaciones.length === 0 ? (
+                          <p className="text-xs text-slate-500 italic text-center py-4 bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">No hay postulantes aún.</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {!loading && adminMisionesPostulaciones.map(post => (
+                              <div key={post.id} className="bg-white dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
+                                  <div>
+                                    <p className="font-bold text-xs text-slate-900 dark:text-white">{post.profiles?.nombre}</p>
+                                    <div className="flex items-center text-[10px] text-slate-500 space-x-2 mt-0.5">
+                                      <a href={`mailto:${post.profiles?.email}`} className="hover:text-indigo-500">{post.profiles?.email}</a>
+                                      <span>•</span>
+                                      <a href={`tel:${post.profiles?.tel}`} className="hover:text-indigo-500">{post.profiles?.tel || 'Sin Teléfono'}</a>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center space-x-2">
+                                    <select
+                                      value={post.estado}
+                                      onChange={(e) => handleUpdatePostulacion(post.id, e.target.value)}
+                                      className={`text-xs font-semibold px-2 py-1 rounded-lg border focus:outline-none ${
+                                        post.estado === 'aprobado' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' :
+                                        post.estado === 'rechazado' ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800' :
+                                        'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800'
+                                      }`}
+                                    >
+                                      <option value="pendiente">Pendiente</option>
+                                      <option value="aprobado">Aprobado</option>
+                                      <option value="rechazado">Rechazado</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-800/60">
+                                  <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Motivación:</p>
+                                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{post.motivacion}</p>
+                                </div>
+                                <div className="mt-2 text-[9px] text-slate-400 text-right">
+                                  Postulado el {new Date(post.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
