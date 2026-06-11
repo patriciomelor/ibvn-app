@@ -7,6 +7,31 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [moduleVisibility, setModuleVisibility] = useState({
+    devocional: false,
+    archive: false,
+    misiones: false,
+    escuela: false,
+    deportes: false,
+    recursos: false
+  })
+
+  const fetchVisibility = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('module_visibility')
+        .select('*')
+      if (!error && data) {
+        const dict = {}
+        data.forEach(item => {
+          dict[item.module_key] = item.is_public
+        })
+        setModuleVisibility(dict)
+      }
+    } catch (err) {
+      console.warn('Error fetching module visibility (table might not exist yet):', err.message)
+    }
+  }
 
   const fetchProfile = async (userId) => {
     try {
@@ -29,6 +54,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   useEffect(() => {
+    fetchVisibility()
     // 1. Verificar sesión activa inicial de manera segura
     supabase.auth.getSession()
       .then(async ({ data: { session } }) => {
@@ -132,9 +158,11 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateProfile: updateProfileData,
-    rol: profile?.rol || 'miembro',
+    rol: profile?.rol || (user ? 'miembro' : 'invitado'),
     isPastorAdmin: profile?.rol === 'pastor_admin',
     isLider: profile?.rol === 'lider' || profile?.rol === 'pastor_admin',
+    moduleVisibility,
+    refreshVisibility: fetchVisibility,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

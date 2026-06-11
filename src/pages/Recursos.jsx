@@ -50,11 +50,9 @@ export default function Recursos() {
   // Manejar descarga y actualizar contador
   const handleDownload = async (resource) => {
     try {
-      // Intentar actualizar el contador en Supabase
+      // Incrementar el contador usando la función RPC segura en Supabase
       const { error } = await supabase
-        .from('recursos')
-        .update({ downloads_count: resource.downloads_count + 1 })
-        .eq('id', resource.id)
+        .rpc('increment_recurso_downloads', { recurso_id: resource.id })
 
       if (error) throw error
 

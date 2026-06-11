@@ -1,11 +1,11 @@
 import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, History, User, ShieldCheck, LogOut, Globe, Award, Activity, FileText } from 'lucide-react'
+import { BookOpen, History, User, ShieldCheck, LogOut, LogIn, Globe, Award, Activity, FileText } from 'lucide-react'
 import OnboardingModal from './OnboardingModal'
 
 export default function Layout({ children }) {
-  const { profile, logout, isPastorAdmin } = useAuth()
+  const { profile, logout, isPastorAdmin, moduleVisibility } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -19,9 +19,21 @@ export default function Layout({ children }) {
     { path: '/profile', label: 'Mi Perfil', icon: User },
   ]
 
-  if (isPastorAdmin) {
+  if (profile && isPastorAdmin) {
     navItems.push({ path: '/admin', label: 'Pastor/Admin', icon: ShieldCheck })
   }
+
+  // Filtrar ítems de navegación según estado de autenticación y configuraciones de visibilidad
+  const visibleNavItems = navItems.filter(item => {
+    if (item.path === '/profile' || item.path === '/admin') {
+      return !!profile
+    }
+    if (!profile) {
+      const key = item.path === '/' ? 'devocional' : item.path.slice(1)
+      return moduleVisibility && moduleVisibility[key] === true
+    }
+    return true
+  })
 
   const handleLogout = async () => {
     try {
@@ -56,17 +68,19 @@ export default function Layout({ children }) {
         {/* Info de Usuario Breve */}
         <div className="mb-6 p-3 rounded-xl bg-slate-800/40 border border-slate-700/30 flex items-center space-x-3">
           <div className="w-10 h-10 rounded-full bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-300 font-display">
-            {profile?.nombre?.charAt(0).toUpperCase() || 'U'}
+            {profile?.nombre?.charAt(0).toUpperCase() || '?'}
           </div>
           <div className="overflow-hidden">
-            <p className="text-sm font-semibold text-slate-200 truncate">{profile?.nombre}</p>
-            <p className="text-xs text-slate-400 capitalize">{profile?.rol === 'pastor_admin' ? 'Pastor / Administrador' : profile?.rol}</p>
+            <p className="text-sm font-semibold text-slate-200 truncate">{profile?.nombre || 'Invitado'}</p>
+            <p className="text-xs text-slate-400 capitalize">
+              {profile ? (profile.rol === 'pastor_admin' ? 'Pastor / Admin' : profile.rol) : 'Navegación Pública'}
+            </p>
           </div>
         </div>
 
         {/* Menú de Navegación */}
         <nav className="flex-1 space-y-1">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon
             const active = isActive(item.path)
             return (
@@ -86,14 +100,24 @@ export default function Layout({ children }) {
           })}
         </nav>
 
-        {/* Botón de Logout */}
-        <button
-          onClick={handleLogout}
-          className="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-rose-950/20 hover:text-rose-400 border border-transparent rounded-xl text-sm font-medium transition-all duration-200 mt-auto"
-        >
-          <LogOut className="w-5 h-5" />
-          <span>Cerrar Sesión</span>
-        </button>
+        {/* Botón de Logout / Login */}
+        {profile ? (
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-rose-950/20 hover:text-rose-400 border border-transparent rounded-xl text-sm font-medium transition-all duration-200 mt-auto"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Cerrar Sesión</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate('/login')}
+            className="flex items-center space-x-3 px-4 py-3 text-indigo-400 hover:bg-indigo-950/20 hover:text-indigo-300 border border-transparent rounded-xl text-sm font-medium transition-all duration-200 mt-auto"
+          >
+            <LogIn className="w-5 h-5" />
+            <span>Iniciar Sesión</span>
+          </button>
+        )}
       </aside>
 
       {/* 2. HEADER PARA MÓVIL */}
@@ -104,13 +128,23 @@ export default function Layout({ children }) {
         </div>
         
         {/* Mini botón logout en móvil */}
-        <button
-          onClick={handleLogout}
-          className="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
-          title="Cerrar Sesión"
-        >
-          <LogOut className="w-5 h-5" />
-        </button>
+        {profile ? (
+          <button
+            onClick={handleLogout}
+            className="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
+            title="Cerrar Sesión"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate('/login')}
+            className="p-2 text-indigo-400 hover:text-indigo-300 rounded-lg hover:bg-slate-805 transition-colors"
+            title="Iniciar Sesión"
+          >
+            <LogIn className="w-5 h-5" />
+          </button>
+        )}
       </header>
 
       {/* 3. CONTENIDO PRINCIPAL */}
@@ -122,7 +156,7 @@ export default function Layout({ children }) {
 
       {/* 4. BOTTOM BAR (Navegación Móvil) */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/90 backdrop-blur-md border-t border-slate-800/80 px-2 py-2 flex justify-around shadow-lg">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon
           const active = isActive(item.path)
           return (

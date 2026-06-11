@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { 
@@ -19,6 +20,7 @@ import {
 
 export default function Deportes() {
   const { user, isLider } = useAuth()
+  const navigate = useNavigate()
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null) // holds activity_id during registration action
@@ -221,8 +223,8 @@ export default function Deportes() {
           {activities.map((act) => {
             const registrations = act.sports_registrations || []
             const registeredCount = registrations.length
-            const isUserRegistered = registrations.some(r => r.user_id === user.id)
-            const userRegistration = registrations.find(r => r.user_id === user.id)
+            const isUserRegistered = user ? registrations.some(r => r.user_id === user.id) : false
+            const userRegistration = user ? registrations.find(r => r.user_id === user.id) : null
             const isFull = registeredCount >= act.limit_slots
             const slotsRemaining = Math.max(0, act.limit_slots - registeredCount)
             
@@ -314,7 +316,15 @@ export default function Deportes() {
 
                 {/* Botón de Acción Principal */}
                 <div className="pt-2">
-                  {isUserRegistered ? (
+                  {!user ? (
+                    <button
+                      onClick={() => navigate('/login')}
+                      className="w-full flex items-center justify-center space-x-2 bg-slate-900 hover:bg-slate-800 text-indigo-400 border border-slate-800 py-3 rounded-xl transition-all active:scale-[0.98] text-xs font-semibold font-display"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>Inicia sesión para inscribirte</span>
+                    </button>
+                  ) : isUserRegistered ? (
                     <button
                       onClick={() => handleCancelRegister(userRegistration.id, act.id)}
                       disabled={actionLoading === act.id}

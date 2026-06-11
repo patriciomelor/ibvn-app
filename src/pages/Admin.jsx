@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink } from 'lucide-react'
+import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings } from 'lucide-react'
 
 export default function Admin() {
-  const { user, isPastorAdmin } = useAuth()
+  const { user, isPastorAdmin, moduleVisibility, refreshVisibility } = useAuth()
   const [activeTab, setActiveTab] = useState('devocional')
   const [loading, setLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
@@ -41,6 +41,9 @@ export default function Admin() {
 
   // 5. Métricas y Alertas Globales
   const [unresolvedAlerts, setUnresolvedAlerts] = useState([])
+
+  // --- NUEVOS ESTADOS SUPER ADMIN ---
+  const [userSearchTerm, setUserSearchTerm] = useState('')
 
   // --- NUEVOS ESTADOS MVP 4 DEPORTES Y RECURSOS ---
   const [sports, setSports] = useState([])
@@ -247,6 +250,46 @@ export default function Admin() {
     } catch (err) {
       console.error(err)
       setErrorMessage('Error al eliminar el recurso.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdateUserRole = async (userId, newRole) => {
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ rol: newRole })
+        .eq('id', userId)
+      if (error) throw error
+      setSuccessMessage('¡Rol de usuario actualizado con éxito!')
+      await loadAdminData()
+    } catch (err) {
+      console.error(err)
+      setErrorMessage(err.message || 'Error al actualizar el rol de usuario.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleToggleVisibility = async (moduleKey, currentStatus) => {
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const { error } = await supabase
+        .from('module_visibility')
+        .update({ is_public: !currentStatus })
+        .eq('module_key', moduleKey)
+      if (error) throw error
+      setSuccessMessage(`¡Visibilidad del módulo actualizada con éxito!`)
+      await refreshVisibility()
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al actualizar la visibilidad del módulo.')
     } finally {
       setLoading(false)
     }
@@ -662,6 +705,28 @@ export default function Admin() {
         >
           <FileText className="w-4 h-4" />
           <span>Recursos</span>
+        </button>
+        <button
+          onClick={() => { setActiveTab('usuarios'); setSelectedUser(null); }}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
+            activeTab === 'usuarios'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Usuarios</span>
+        </button>
+        <button
+          onClick={() => { setActiveTab('configuracion'); setSelectedUser(null); }}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
+            activeTab === 'configuracion'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          <span>Configuraciones</span>
         </button>
       </div>
 
@@ -1654,6 +1719,136 @@ export default function Admin() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: GESTIÓN DE USUARIOS */}
+      {activeTab === 'usuarios' && (
+        <div className="glass rounded-3xl p-6 border border-slate-850 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold font-display text-white">Gestión de Usuarios</h3>
+              <p className="text-slate-400 text-xs mt-1">
+                Asigna roles y privilegios a los miembros registrados en la aplicación.
+              </p>
+            </div>
+            
+            {/* Buscador de usuarios */}
+            <div className="relative w-full md:w-80">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+                placeholder="Buscar por nombre o correo..."
+                className="w-full bg-slate-950 border border-slate-850 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div className="bg-slate-900/40 rounded-2xl border border-slate-850/80 overflow-hidden overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-350">
+              <thead className="bg-slate-950/80 border-b border-slate-850/60 font-semibold text-slate-400">
+                <tr>
+                  <th className="p-4">Nombre</th>
+                  <th className="p-4">Email</th>
+                  <th className="p-4">Adscripción</th>
+                  <th className="p-4 text-right">Rol y Privilegios</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-850/40">
+                {profiles.filter(p => 
+                  p.nombre.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                  p.email.toLowerCase().includes(userSearchTerm.toLowerCase())
+                ).length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="p-8 text-center text-slate-500 italic">
+                      No se encontraron usuarios coincidentes.
+                    </td>
+                  </tr>
+                ) : (
+                  profiles.filter(p => 
+                    p.nombre.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                    p.email.toLowerCase().includes(userSearchTerm.toLowerCase())
+                  ).map((p) => (
+                    <tr key={p.id} className="hover:bg-slate-900/30 transition-colors">
+                      <td className="p-4 font-bold text-slate-200">{p.nombre}</td>
+                      <td className="p-4 font-mono text-slate-400">{p.email}</td>
+                      <td className="p-4">
+                        <p className="text-[10px] text-slate-400 leading-tight">Célula: {p.celulas?.nombre || 'Ninguna'}</p>
+                        <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Ministerio: {p.ministerios?.nombre || 'Ninguno'}</p>
+                      </td>
+                      <td className="p-4 text-right">
+                        <select
+                          value={p.rol}
+                          onChange={(e) => handleUpdateUserRole(p.id, e.target.value)}
+                          disabled={p.id === user.id} // Evitar auto-bloqueo
+                          className={`bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
+                            p.rol === 'pastor_admin' 
+                              ? 'text-rose-400 border-rose-500/20' 
+                              : p.rol === 'lider' 
+                              ? 'text-indigo-400 border-indigo-500/20' 
+                              : 'text-slate-350'
+                          }`}
+                        >
+                          <option value="miembro">Miembro</option>
+                          <option value="lider">Líder</option>
+                          <option value="pastor_admin">Pastor / Administrador</option>
+                        </select>
+                        {p.id === user.id && (
+                          <span className="block text-[9px] text-slate-500 font-semibold uppercase mt-1">Tú (Actual)</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: CONFIGURACIONES */}
+      {activeTab === 'configuracion' && (
+        <div className="glass rounded-3xl p-6 border border-slate-850 space-y-6">
+          <div>
+            <h3 className="text-lg font-bold font-display text-white">Configuración de Visibilidad de Módulos</h3>
+            <p className="text-slate-400 text-xs mt-1">
+              Decide qué módulos se pueden navegar públicamente (sin iniciar sesión) y cuáles requieren obligatoriamente de un inicio de sesión.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[
+              { key: 'devocional', label: 'Devocional Diario', desc: 'Permite leer el devocional diario a invitados. El diario espiritual seguirá requiriendo login.' },
+              { key: 'archive', label: 'Historial de Devocionales', desc: 'Permite ver devocionales de semanas anteriores.' },
+              { key: 'misiones', label: 'Misiones y Campo', desc: 'Permite visualizar pueblos y reportes de misioneros. Comprometerse a orar seguirá requiriendo login.' },
+              { key: 'escuela', label: 'Escuela de Líderes', desc: 'Permite visualizar los temas y lecciones de la Escuela. El avance personal seguirá requiriendo login.' },
+              { key: 'deportes', label: 'Deportes y Recreación', desc: 'Permite ver los próximos partidos y salidas. Inscribirse y ver participantes requerirá login.' },
+              { key: 'recursos', label: 'Biblioteca de Recursos', desc: 'Permite descargar manuales de apoyo doctrinal y el Kit Replicable a cualquier visitante.' },
+            ].map((mod) => {
+              const isPublic = moduleVisibility && moduleVisibility[mod.key] === true
+              return (
+                <div key={mod.key} className="p-5 bg-slate-900/40 rounded-2xl border border-slate-850 flex items-center justify-between gap-6 hover:border-slate-800 transition-all">
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-xs text-slate-200">{mod.label}</h4>
+                    <p className="text-slate-500 text-[10px] leading-relaxed max-w-sm">{mod.desc}</p>
+                  </div>
+                  
+                  {/* Toggle Button */}
+                  <button
+                    onClick={() => handleToggleVisibility(mod.key, isPublic)}
+                    disabled={loading}
+                    className={`w-14 h-7 rounded-full p-1 transition-all duration-300 flex items-center shrink-0 ${
+                      isPublic ? 'bg-indigo-600 justify-end' : 'bg-slate-800 justify-start'
+                    }`}
+                  >
+                    <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all"></div>
+                  </button>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

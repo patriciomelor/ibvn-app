@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { Globe, Heart, BookOpen, Users, Compass, Calendar, Download, Loader, CheckCircle, HeartCrack } from 'lucide-react'
+import { Globe, Heart, BookOpen, Users, Compass, Calendar, Download, Loader, CheckCircle, HeartCrack, LogIn } from 'lucide-react'
 
 export default function Misiones() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('pueblo')
   const [loading, setLoading] = useState(true)
   
@@ -249,29 +251,39 @@ export default function Misiones() {
                 </div>
               </div>
 
-              <button
-                onClick={handleTogglePrayer}
-                disabled={actionLoading}
-                className={`w-full flex items-center justify-center space-x-2 font-medium py-3 rounded-xl transition-all active:scale-[0.98] text-xs font-display ${
-                  isPraying
-                    ? 'bg-rose-950/20 hover:bg-rose-950/40 text-rose-400 border border-rose-500/20'
-                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-950/50'
-                }`}
-              >
-                {actionLoading ? (
-                  <Loader className="w-4 h-4 animate-spin" />
-                ) : isPraying ? (
-                  <>
-                    <HeartCrack className="w-4 h-4" />
-                    <span>Quitar de mis Oraciones</span>
-                  </>
-                ) : (
-                  <>
-                    <Heart className="w-4 h-4" />
-                    <span>Comprometerse a Orar</span>
-                  </>
-                )}
-              </button>
+              {!user ? (
+                <button
+                  onClick={() => navigate('/login')}
+                  className="w-full flex items-center justify-center space-x-2 font-medium py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-indigo-400 border border-slate-800 transition-all active:scale-[0.98] text-xs font-display"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Inicia sesión para comprometerte</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleTogglePrayer}
+                  disabled={actionLoading}
+                  className={`w-full flex items-center justify-center space-x-2 font-medium py-3 rounded-xl transition-all active:scale-[0.98] text-xs font-display ${
+                    isPraying
+                      ? 'bg-rose-950/20 hover:bg-rose-950/40 text-rose-400 border border-rose-500/20'
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-950/50'
+                  }`}
+                >
+                  {actionLoading ? (
+                    <Loader className="w-4 h-4 animate-spin" />
+                  ) : isPraying ? (
+                    <>
+                      <HeartCrack className="w-4 h-4" />
+                      <span>Quitar de mis Oraciones</span>
+                    </>
+                  ) : (
+                    <>
+                      <Heart className="w-4 h-4" />
+                      <span>Comprometerse a Orar</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           )}
         </div>

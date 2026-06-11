@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { BookOpen, Calendar, Save, Share2, Printer, CheckCircle, Loader, AlertCircle } from 'lucide-react'
 
 export default function Devocional() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [devocional, setDevocional] = useState(null)
   const [journal, setJournal] = useState({
     apreciacion: '',
@@ -273,68 +275,84 @@ https://vidanueva.app/`
                 </div>
               )}
 
-              <form onSubmit={handleSaveJournal} className="space-y-5">
-                
-                {/* Bloque 1: Lo que Dios me dijo */}
-                <div>
-                  <label className="block text-slate-300 text-xs font-semibold mb-2">
-                    1. ¿Qué me enseñó Dios hoy? (Apreciación)
-                  </label>
-                  <textarea
-                    rows="3"
-                    value={journal.apreciacion}
-                    onChange={(e) => setJournal({ ...journal, apreciacion: e.target.value })}
-                    placeholder="Escribe lo que el pasaje o la reflexión hablaron a tu corazón..."
-                    className="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
-                  />
+              {!user ? (
+                <div className="text-center py-6 px-4 bg-slate-900/60 rounded-2xl border border-slate-800/80 space-y-4">
+                  <BookOpen className="w-10 h-10 text-indigo-400/50 mx-auto" />
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Diario Espiritual Privado</h4>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Inicia sesión o regístrate para llevar tu diario personal, anotar lo que Dios te enseña hoy y guardar tus motivos de oración.
+                  </p>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-xl text-xs transition-all active:scale-[0.98] font-display"
+                  >
+                    Iniciar Sesión
+                  </button>
                 </div>
+              ) : (
+                <form onSubmit={handleSaveJournal} className="space-y-5">
+                  
+                  {/* Bloque 1: Lo que Dios me dijo */}
+                  <div>
+                    <label className="block text-slate-300 text-xs font-semibold mb-2">
+                      1. ¿Qué me enseñó Dios hoy? (Apreciación)
+                    </label>
+                    <textarea
+                      rows="3"
+                      value={journal.apreciacion}
+                      onChange={(e) => setJournal({ ...journal, apreciacion: e.target.value })}
+                      placeholder="Escribe lo que el pasaje o la reflexión hablaron a tu corazón..."
+                      className="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
+                    />
+                  </div>
 
-                {/* Bloque 2: Cosas a cambiar */}
-                <div>
-                  <label className="block text-slate-300 text-xs font-semibold mb-2">
-                    2. ¿Qué decisiones prácticas debo tomar? (Cambios)
-                  </label>
-                  <textarea
-                    rows="3"
-                    value={journal.cambios}
-                    onChange={(e) => setJournal({ ...journal, cambios: e.target.value })}
-                    placeholder="Acciones o actitudes concretas que Dios te motiva a corregir o iniciar..."
-                    className="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
-                  />
-                </div>
+                  {/* Bloque 2: Cosas a cambiar */}
+                  <div>
+                    <label className="block text-slate-300 text-xs font-semibold mb-2">
+                      2. ¿Qué decisiones prácticas debo tomar? (Cambios)
+                    </label>
+                    <textarea
+                      rows="3"
+                      value={journal.cambios}
+                      onChange={(e) => setJournal({ ...journal, cambios: e.target.value })}
+                      placeholder="Acciones o actitudes concretas que Dios te motiva a corregir o iniciar..."
+                      className="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
+                    />
+                  </div>
 
-                {/* Bloque 3: Motivos de oración */}
-                <div>
-                  <label className="block text-slate-300 text-xs font-semibold mb-2">
-                    3. Mis Motivos de Oración
-                  </label>
-                  <textarea
-                    rows="3"
-                    value={journal.oracion_personal}
-                    onChange={(e) => setJournal({ ...journal, oracion_personal: e.target.value })}
-                    placeholder="Escribe tus peticiones de oración de hoy..."
-                    className="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
-                  />
-                </div>
+                  {/* Bloque 3: Motivos de oración */}
+                  <div>
+                    <label className="block text-slate-300 text-xs font-semibold mb-2">
+                      3. Mis Motivos de Oración
+                    </label>
+                    <textarea
+                      rows="3"
+                      value={journal.oracion_personal}
+                      onChange={(e) => setJournal({ ...journal, oracion_personal: e.target.value })}
+                      placeholder="Escribe tus peticiones de oración de hoy..."
+                      className="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
+                    />
+                  </div>
 
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 text-xs font-display"
-                >
-                  {saving ? (
-                    <>
-                      <Loader className="w-4 h-4 animate-spin" />
-                      <span>Guardando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      <span>Guardar en Diario</span>
-                    </>
-                  )}
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 text-xs font-display"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin" />
+                        <span>Guardando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>Guardar en Diario</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         </div>

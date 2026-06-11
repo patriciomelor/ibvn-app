@@ -13,8 +13,8 @@ import EscuelaLideres from './pages/EscuelaLideres'
 import Deportes from './pages/Deportes'
 import Recursos from './pages/Recursos'
 
-function ProtectedRoute({ children, adminOnly = false }) {
-  const { user, loading, isPastorAdmin } = useAuth()
+function ProtectedRoute({ children, moduleKey, adminOnly = false }) {
+  const { user, loading, isPastorAdmin, moduleVisibility } = useAuth()
 
   if (loading) {
     return (
@@ -25,12 +25,21 @@ function ProtectedRoute({ children, adminOnly = false }) {
     )
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />
+  // Si requiere administrador
+  if (adminOnly) {
+    if (!user || !isPastorAdmin) {
+      return <Navigate to="/" replace />
+    }
+    return <Layout>{children}</Layout>
   }
 
-  if (adminOnly && !isPastorAdmin) {
-    return <Navigate to="/" replace />
+  // Si no hay usuario activo
+  if (!user) {
+    const isPublic = moduleVisibility && moduleVisibility[moduleKey]
+    if (isPublic) {
+      return <Layout>{children}</Layout>
+    }
+    return <Navigate to="/login" replace />
   }
 
   return <Layout>{children}</Layout>
@@ -49,7 +58,7 @@ function App() {
           <Route
             path="/"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="devocional">
                 <Devocional />
               </ProtectedRoute>
             }
@@ -57,7 +66,7 @@ function App() {
           <Route
             path="/archive"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="archive">
                 <Archive />
               </ProtectedRoute>
             }
@@ -65,7 +74,7 @@ function App() {
           <Route
             path="/misiones"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="misiones">
                 <Misiones />
               </ProtectedRoute>
             }
@@ -73,7 +82,7 @@ function App() {
           <Route
             path="/escuela"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="escuela">
                 <EscuelaLideres />
               </ProtectedRoute>
             }
@@ -81,7 +90,7 @@ function App() {
           <Route
             path="/deportes"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="deportes">
                 <Deportes />
               </ProtectedRoute>
             }
@@ -89,7 +98,7 @@ function App() {
           <Route
             path="/recursos"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="recursos">
                 <Recursos />
               </ProtectedRoute>
             }
@@ -97,7 +106,7 @@ function App() {
           <Route
             path="/profile"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="profile">
                 <Profile />
               </ProtectedRoute>
             }
