@@ -43,7 +43,7 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center items-center p-4">
       {/* Círculos decorativos de fondo */}
       <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-violet-600/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -51,8 +51,8 @@ export default function Register() {
       <div className="w-full max-w-md glass rounded-3xl p-8 relative z-10 shadow-2xl">
         {/* Cabecera */}
         <div className="flex flex-col items-center mb-8">
-          <h2 className="text-3xl font-bold font-display text-white tracking-tight">Crear Cuenta</h2>
-          <p className="text-slate-400 text-sm mt-1">Únete a Vida Nueva App</p>
+          <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight">Crear Cuenta</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Únete a Vida Nueva App</p>
         </div>
 
         {/* Mensaje de Éxito */}
@@ -74,7 +74,7 @@ export default function Register() {
         {/* Formulario */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
+            <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
               Nombre Completo
             </label>
             <div className="relative">
@@ -85,13 +85,13 @@ export default function Register() {
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="Juan Pérez"
-                className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
+            <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
               Correo Electrónico
             </label>
             <div className="relative">
@@ -102,13 +102,13 @@ export default function Register() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ejemplo@correo.com"
-                className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
+            <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
               Contraseña
             </label>
             <div className="relative">
@@ -119,13 +119,13 @@ export default function Register() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
+            <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
               Confirmar Contraseña
             </label>
             <div className="relative">
@@ -136,7 +136,7 @@ export default function Register() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repite tu contraseña"
-                className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
             </div>
           </div>
@@ -144,13 +144,13 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading || success}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-xl shadow-lg shadow-indigo-950/50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none text-sm font-display"
+            className="w-full bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-3 rounded-xl shadow-lg shadow-indigo-950/50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none text-sm font-display"
           >
             {loading ? 'Creando Cuenta...' : 'Registrarse'}
           </button>
         </form>
 
-        <div className="mt-8 text-center text-sm text-slate-400">
+        <div className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">
           ¿Ya tienes cuenta?{' '}
           <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
             Inicia sesión aquí

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { User, Phone, MapPin, Calendar, Heart, Shield, CheckCircle, Save, Loader, AlertCircle, Laptop, Sun, Moon } from 'lucide-react'
+import { User, Phone, MapPin, Calendar, Heart, Shield, CheckCircle, Save, Loader, AlertCircle, Laptop, Sun, Moon, Camera } from 'lucide-react'
 
 export default function Profile() {
   const { user, profile, updateProfile } = useAuth()
@@ -13,6 +13,8 @@ export default function Profile() {
   const [direccion, setDireccion] = useState('')
   const [fechaNacimiento, setFechaNacimiento] = useState('')
   const [comoLlego, setComoLlego] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -24,18 +26,54 @@ export default function Profile() {
 
   // Cargar datos extendidos
   const fetchExtendedData = async () => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
     try {
       setLoading(true)
       
-      // 1. Cargar datos del perfil
-      const { data: profData, error: profErr } = await supabase
+      // 1. Asegurar existencia de perfil vía RPC (auto-healing)
+      try {
+        await supabase.rpc('ensure_profile_exists')
+      } catch (rpcErr) {
+        console.warn('ensure_profile_exists RPC error in Profile page:', rpcErr.message)
+      }
+      
+      // 2. Cargar datos del perfil
+      let { data: profData, error: profErr } = await supabase
         .from('profiles')
-        .select('*, celulas(nombre), ministerios(nombre)')
+        .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
         .eq('id', user.id)
         .single()
 
-      if (profErr) throw profErr
+      if (profErr) {
+        if (profErr.code === 'PGRST116') {
+          // Fallback client-side insertion
+          try {
+            const { data: newProf, error: insertErr } = await supabase
+              .from('profiles')
+              .insert({
+                id: user.id,
+                email: user.email,
+                nombre: user.user_metadata?.nombre || user.user_metadata?.name || 'Miembro Nuevo',
+                rol: 'miembro'
+              })
+              .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
+              .single()
+            
+            if (!insertErr) {
+              profData = newProf
+            } else {
+              throw profErr
+            }
+          } catch (fallbackErr) {
+            throw profErr
+          }
+        } else {
+          throw profErr
+        }
+      }
 
       if (profData) {
         setNombre(profData.nombre || '')
@@ -43,16 +81,33 @@ export default function Profile() {
         setDireccion(profData.direccion || '')
         setFechaNacimiento(profData.fecha_nacimiento || '')
         setComoLlego(profData.como_llego || '')
+        setAvatarUrl(profData.avatar_url || '')
       }
 
-      // 2. Cargar registro espiritual
-      const { data: spData, error: spErr } = await supabase
+      // 3. Cargar registro espiritual
+      let { data: spData, error: spErr } = await supabase
         .from('spiritual_records')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle()
 
       if (spErr) throw spErr
+
+      if (!spData) {
+        // Fallback client-side insertion
+        try {
+          const { data: newSp, error: insertSpErr } = await supabase
+            .from('spiritual_records')
+            .insert({ user_id: user.id })
+            .select('*')
+            .maybeSingle()
+          if (!insertSpErr) {
+            spData = newSp
+          }
+        } catch (spFallbackErr) {
+          console.warn('Spiritual record fallback insertion failed:', spFallbackErr.message)
+        }
+      }
       setSpiritualRecord(spData)
 
     } catch (err) {
@@ -97,6 +152,43 @@ export default function Profile() {
     }
   }, [theme])
 
+  const handleAvatarUpload = async (event) => {
+    try {
+      setIsUploadingAvatar(true)
+      const file = event.target.files[0]
+      if (!file) return
+      
+      if (file.size > 2 * 1024 * 1024) {
+        setErrorMessage('La imagen no puede pesar más de 2MB')
+        return
+      }
+
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      let { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      setAvatarUrl(publicUrl)
+      await updateProfile({ avatar_url: publicUrl })
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (error) {
+      console.error(error)
+      setErrorMessage('Error subiendo la imagen: ' + error.message)
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
+
   const handleSaveProfile = async (e) => {
     e.preventDefault()
     setSaving(true)
@@ -109,7 +201,8 @@ export default function Profile() {
         tel,
         direccion,
         fecha_nacimiento: fechaNacimiento || null,
-        como_llego: comoLlego
+        como_llego: comoLlego,
+        avatar_url: avatarUrl
       })
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
@@ -125,7 +218,7 @@ export default function Profile() {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <Loader className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-        <p className="text-slate-400 text-sm">Cargando información del perfil...</p>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">Cargando información del perfil...</p>
       </div>
     )
   }
@@ -134,19 +227,43 @@ export default function Profile() {
     <div className="space-y-8">
       {/* Cabecera */}
       <div>
-        <h2 className="text-3xl font-bold font-display text-white tracking-tight">Mi Perfil</h2>
-        <p className="text-slate-400 text-sm mt-1">Administra tus datos personales y sigue tu crecimiento ministerial.</p>
+        <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight">Mi Perfil</h2>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Administra tus datos personales y sigue tu crecimiento ministerial.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Lado Izquierdo: Configuración e Info General */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="glass rounded-3xl p-6 border border-slate-850">
-            <h3 className="text-lg font-bold font-display text-white mb-6 flex items-center space-x-2">
+          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850">
+            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
               <User className="w-5 h-5 text-indigo-400" />
               <span>Información Personal</span>
             </h3>
+
+            {/* FOTO DE PERFIL */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+              <div className="relative shrink-0">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-indigo-600/20 border-2 border-indigo-500/30 flex items-center justify-center font-bold text-indigo-500 dark:text-indigo-300 text-3xl font-display overflow-hidden shadow-inner">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    nombre.charAt(0).toUpperCase() || '?'
+                  )}
+                </div>
+                <label className="absolute bottom-0 right-0 p-2 bg-indigo-600 hover:bg-indigo-500 rounded-full cursor-pointer text-white shadow-lg transition-all hover:scale-105 active:scale-95 border-2 border-white dark:border-slate-900" title="Cambiar Foto">
+                  {isUploadingAvatar ? <Loader className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={isUploadingAvatar} />
+                </label>
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Foto de Perfil</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
+                  Sube una foto clara para que tus líderes y pastores puedan reconocerte en el catastro. <br/>
+                  <span className="font-medium">Formato:</span> JPG, PNG. <span className="font-medium">Máx:</span> 2MB.
+                </p>
+              </div>
+            </div>
 
             {errorMessage && (
               <div className="glass-rose flex items-start space-x-2 p-4 rounded-xl text-rose-300 text-sm mb-6">
@@ -164,7 +281,7 @@ export default function Profile() {
 
             <form onSubmit={handleSaveProfile} className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="sm:col-span-2">
-                <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                   Nombre Completo
                 </label>
                 <input
@@ -172,24 +289,24 @@ export default function Profile() {
                   required
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
-                  className="w-full bg-slate-900/60 border border-slate-800 rounded-xl py-3 px-4 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
+                  className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                   Correo Electrónico (No modificable)
                 </label>
                 <input
                   type="email"
                   disabled
                   value={profile?.email || ''}
-                  className="w-full bg-slate-950 border border-slate-900 rounded-xl py-3 px-4 text-slate-500 text-sm cursor-not-allowed"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-xl py-3 px-4 text-slate-500 text-sm cursor-not-allowed"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                   Teléfono de Contacto
                 </label>
                 <div className="relative">
@@ -199,13 +316,13 @@ export default function Profile() {
                     value={tel}
                     onChange={(e) => setTel(e.target.value)}
                     placeholder="+56 9 1234 5678"
-                    className="w-full bg-slate-900/60 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
+                    className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
                   />
                 </div>
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                   Dirección Residencial
                 </label>
                 <div className="relative">
@@ -215,13 +332,13 @@ export default function Profile() {
                     value={direccion}
                     onChange={(e) => setDireccion(e.target.value)}
                     placeholder="Calle Falsa 123, Providencia"
-                    className="w-full bg-slate-900/60 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
+                    className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                   Fecha de Nacimiento
                 </label>
                 <div className="relative">
@@ -230,13 +347,13 @@ export default function Profile() {
                     type="date"
                     value={fechaNacimiento}
                     onChange={(e) => setFechaNacimiento(e.target.value)}
-                    className="w-full bg-slate-900/60 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
+                    className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                   ¿Cómo llegaste a la Iglesia?
                 </label>
                 <input
@@ -244,7 +361,7 @@ export default function Profile() {
                   value={comoLlego}
                   onChange={(e) => setComoLlego(e.target.value)}
                   placeholder="Amigo, redes sociales, familiar, etc."
-                  className="w-full bg-slate-900/60 border border-slate-800 rounded-xl py-3 px-4 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
+                  className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
                 />
               </div>
 
@@ -252,7 +369,7 @@ export default function Profile() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 text-sm font-display"
+                  className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 text-sm font-display"
                 >
                   {saving ? (
                     <>
@@ -271,12 +388,12 @@ export default function Profile() {
           </div>
 
           {/* Configuración de Preferencias / Tema */}
-          <div className="glass rounded-3xl p-6 border border-slate-850">
-            <h3 className="text-lg font-bold font-display text-white mb-4 flex items-center space-x-2">
+          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850">
+            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
               <Laptop className="w-5 h-5 text-indigo-400" />
               <span>Configuración de Pantalla</span>
             </h3>
-            <p className="text-slate-400 text-xs mb-4">Elige la apariencia visual de la aplicación según tu gusto.</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Elige la apariencia visual de la aplicación según tu gusto.</p>
             
             <div className="grid grid-cols-3 gap-3">
               {[
@@ -293,7 +410,7 @@ export default function Profile() {
                     className={`flex flex-col items-center justify-center p-4 rounded-xl border text-xs font-semibold transition-all ${
                       selected
                         ? 'bg-indigo-600/10 text-indigo-400 border-indigo-500'
-                        : 'bg-slate-900/40 text-slate-400 border-slate-800 hover:bg-slate-900/80 hover:text-slate-200'
+                        : 'bg-slate-50/80 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-white dark:bg-slate-900/80 hover:text-slate-700 dark:text-slate-200'
                     }`}
                   >
                     <Icon className="w-5 h-5 mb-2" />
@@ -309,28 +426,28 @@ export default function Profile() {
         <div className="space-y-6">
           
           {/* Asignaciones ministeriales */}
-          <div className="glass rounded-3xl p-6 border border-slate-850">
-            <h3 className="text-lg font-bold font-display text-white mb-4 flex items-center space-x-2">
+          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850">
+            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
               <Shield className="w-5 h-5 text-indigo-400" />
               <span>Adscripción</span>
             </h3>
             
             <div className="space-y-4">
-              <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80">
+              <div className="p-3 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
                 <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">Rol en App</span>
-                <span className="text-slate-200 text-sm font-semibold capitalize">{profile?.rol}</span>
+                <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold capitalize">{profile?.rol}</span>
               </div>
 
-              <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80">
+              <div className="p-3 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
                 <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">Grupo Pequeño / Célula</span>
-                <span className="text-slate-200 text-sm font-semibold">
+                <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">
                   {profile?.celulas?.nombre || 'No asignada todavía'}
                 </span>
               </div>
 
-              <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80">
+              <div className="p-3 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
                 <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">Ministerio Principal</span>
-                <span className="text-slate-200 text-sm font-semibold">
+                <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">
                   {profile?.ministerios?.nombre || 'No asignado todavía'}
                 </span>
               </div>
@@ -338,12 +455,12 @@ export default function Profile() {
           </div>
 
           {/* Progreso espiritual / Discipulado */}
-          <div className="glass rounded-3xl p-6 border border-slate-850">
-            <h3 className="text-lg font-bold font-display text-white mb-4 flex items-center space-x-2">
+          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850">
+            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
               <Heart className="w-5 h-5 text-indigo-400" />
               <span>Progreso de Discipulado</span>
             </h3>
-            <p className="text-slate-400 text-xs mb-6">Historial de requisitos y formación espiritual aprobada.</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-6">Historial de requisitos y formación espiritual aprobada.</p>
             
             {spiritualRecord ? (
               <div className="space-y-4">
@@ -357,15 +474,15 @@ export default function Profile() {
                 ].map((item) => {
                   const completed = spiritualRecord[item.key]
                   return (
-                    <div key={item.key} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-slate-800/60">
-                      <span className="text-slate-300 text-xs font-semibold">{item.label}</span>
+                    <div key={item.key} className="flex items-center justify-between p-3 bg-slate-50/80 dark:bg-slate-900/40 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
+                      <span className="text-slate-600 dark:text-slate-300 text-xs font-semibold">{item.label}</span>
                       {completed ? (
                         <div className="flex items-center space-x-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 text-[10px] font-bold">
                           <CheckCircle className="w-3.5 h-3.5" />
                           <span>Completado</span>
                         </div>
                       ) : (
-                        <span className="text-[10px] text-slate-500 font-bold bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-900">
+                        <span className="text-[10px] text-slate-500 font-bold bg-slate-50 dark:bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-900">
                           Pendiente
                         </span>
                       )}

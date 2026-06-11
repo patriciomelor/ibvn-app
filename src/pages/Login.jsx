@@ -28,7 +28,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center items-center p-4">
       {/* Círculos decorativos traslúcidos de fondo */}
       <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-violet-600/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -41,8 +41,8 @@ export default function Login() {
             alt="Logo" 
             className="w-20 h-20 rounded-2xl shadow-xl border border-indigo-500/20 mb-4 transform hover:scale-105 transition-transform" 
           />
-          <h2 className="text-3xl font-bold font-display text-white tracking-tight">Vida Nueva</h2>
-          <p className="text-slate-400 text-sm mt-1">Santiago, Chile</p>
+          <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight">Vida Nueva</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Santiago, Chile</p>
         </div>
 
         {/* Alerta de Error */}
@@ -56,7 +56,7 @@ export default function Login() {
         {/* Formulario */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
+            <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
               Correo Electrónico
             </label>
             <div className="relative">
@@ -67,14 +67,14 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ejemplo@correo.com"
-                className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
             </div>
           </div>
 
           <div>
             <div className="flex justify-between items-center mb-2">
-              <label className="block text-slate-300 text-xs font-semibold uppercase tracking-wider">
+              <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider">
                 Contraseña
               </label>
             </div>
@@ -86,7 +86,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
             </div>
           </div>
@@ -94,13 +94,13 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-xl shadow-lg shadow-indigo-950/50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none text-sm font-display"
+            className="w-full bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-3 rounded-xl shadow-lg shadow-indigo-950/50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none text-sm font-display"
           >
             {loading ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
 
-        <div className="mt-8 text-center text-sm text-slate-400">
+        <div className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">
           ¿No tienes una cuenta?{' '}
           <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
             Regístrate aquí
