@@ -24,18 +24,54 @@ export default function Profile() {
 
   // Cargar datos extendidos
   const fetchExtendedData = async () => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
     try {
       setLoading(true)
       
-      // 1. Cargar datos del perfil
-      const { data: profData, error: profErr } = await supabase
+      // 1. Asegurar existencia de perfil vía RPC (auto-healing)
+      try {
+        await supabase.rpc('ensure_profile_exists')
+      } catch (rpcErr) {
+        console.warn('ensure_profile_exists RPC error in Profile page:', rpcErr.message)
+      }
+      
+      // 2. Cargar datos del perfil
+      let { data: profData, error: profErr } = await supabase
         .from('profiles')
         .select('*, celulas(nombre), ministerios(nombre)')
         .eq('id', user.id)
         .single()
 
-      if (profErr) throw profErr
+      if (profErr) {
+        if (profErr.code === 'PGRST116') {
+          // Fallback client-side insertion
+          try {
+            const { data: newProf, error: insertErr } = await supabase
+              .from('profiles')
+              .insert({
+                id: user.id,
+                email: user.email,
+                nombre: user.user_metadata?.nombre || user.user_metadata?.name || 'Miembro Nuevo',
+                rol: 'miembro'
+              })
+              .select('*, celulas(nombre), ministerios(nombre)')
+              .single()
+            
+            if (!insertErr) {
+              profData = newProf
+            } else {
+              throw profErr
+            }
+          } catch (fallbackErr) {
+            throw profErr
+          }
+        } else {
+          throw profErr
+        }
+      }
 
       if (profData) {
         setNombre(profData.nombre || '')
@@ -45,14 +81,30 @@ export default function Profile() {
         setComoLlego(profData.como_llego || '')
       }
 
-      // 2. Cargar registro espiritual
-      const { data: spData, error: spErr } = await supabase
+      // 3. Cargar registro espiritual
+      let { data: spData, error: spErr } = await supabase
         .from('spiritual_records')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle()
 
       if (spErr) throw spErr
+
+      if (!spData) {
+        // Fallback client-side insertion
+        try {
+          const { data: newSp, error: insertSpErr } = await supabase
+            .from('spiritual_records')
+            .insert({ user_id: user.id })
+            .select('*')
+            .maybeSingle()
+          if (!insertSpErr) {
+            spData = newSp
+          }
+        } catch (spFallbackErr) {
+          console.warn('Spiritual record fallback insertion failed:', spFallbackErr.message)
+        }
+      }
       setSpiritualRecord(spData)
 
     } catch (err) {

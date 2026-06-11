@@ -35,7 +35,15 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async (userId) => {
     try {
-      const { data, error } = await supabase
+      // 1. Asegurar la existencia del perfil en la base de datos (auto-healing)
+      try {
+        await supabase.rpc('ensure_profile_exists')
+      } catch (rpcErr) {
+        console.warn('ensure_profile_exists RPC error (might not exist yet):', rpcErr.message)
+      }
+
+      // 2. Consultar el perfil
+      let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
@@ -43,6 +51,35 @@ export const AuthProvider = ({ children }) => {
       
       if (error) {
         console.error('Error fetching profile:', error.message)
+        
+        // Fallback: si falla por no existir (PGRST116), intentar insertar desde el cliente
+        if (error.code === 'PGRST116') {
+          try {
+            const { data: { user: authUser } } = await supabase.auth.getUser()
+            if (authUser) {
+              const { data: fallbackProfile, error: insertError } = await supabase
+                .from('profiles')
+                .insert({
+                  id: userId,
+                  email: authUser.email,
+                  nombre: authUser.user_metadata?.nombre || authUser.user_metadata?.name || 'Miembro Nuevo',
+                  rol: 'miembro'
+                })
+                .select()
+                .single()
+              
+              if (!insertError && fallbackProfile) {
+                setProfile(fallbackProfile)
+                // Insertar también registro espiritual
+                await supabase.from('spiritual_records').insert({ user_id: userId })
+                return
+              }
+            }
+          } catch (fallbackErr) {
+            console.error('Profile fallback creation failed:', fallbackErr.message)
+          }
+        }
+        
         setProfile(null)
       } else {
         setProfile(data)

@@ -86,3 +86,34 @@ CREATE POLICY "Permitir ver inscripciones si es público o autenticado" ON publi
         auth.role() = 'authenticated'
         OR EXISTS (SELECT 1 FROM public.module_visibility WHERE module_key = 'deportes' AND is_public = true)
     );
+
+
+-- 4. FUNCIÓN RPC PARA ASEGURAR LA EXISTENCIA DE PERFIL Y REGISTRO ESPIRITUAL (AUTO-HEALING)
+-- Permite que si un usuario de auth.users no tiene su correspondiente registro en profiles o
+-- spiritual_records, se cree automáticamente en caliente.
+CREATE OR REPLACE FUNCTION public.ensure_profile_exists()
+RETURNS VOID SECURITY DEFINER AS $$
+DECLARE
+    user_email TEXT;
+    user_nombre TEXT;
+BEGIN
+    -- Obtener datos de auth.users del usuario actual
+    SELECT email, COALESCE(raw_user_meta_data->>'nombre', raw_user_meta_data->>'name', 'Miembro Nuevo')
+    INTO user_email, user_nombre
+    FROM auth.users
+    WHERE id = auth.uid();
+
+    -- Crear el perfil si no existe
+    IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid()) THEN
+        INSERT INTO public.profiles (id, email, nombre, rol)
+        VALUES (auth.uid(), user_email, user_nombre, 'miembro');
+    END IF;
+
+    -- Crear el registro espiritual si no existe
+    IF NOT EXISTS (SELECT 1 FROM public.spiritual_records WHERE user_id = auth.uid()) THEN
+        INSERT INTO public.spiritual_records (user_id)
+        VALUES (auth.uid());
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
