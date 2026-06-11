@@ -10,6 +10,8 @@ import Profile from './pages/Profile'
 import Admin from './pages/Admin'
 import Misiones from './pages/Misiones'
 import EscuelaLideres from './pages/EscuelaLideres'
+import Deportes from './pages/Deportes'
+import Recursos from './pages/Recursos'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading, isPastorAdmin } = useAuth()
@@ -73,6 +75,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <EscuelaLideres />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/deportes"
+            element={
+              <ProtectedRoute>
+                <Deportes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/recursos"
+            element={
+              <ProtectedRoute>
+                <Recursos />
               </ProtectedRoute>
             }
           />

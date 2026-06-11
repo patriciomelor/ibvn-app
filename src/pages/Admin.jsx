@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare } from 'lucide-react'
+import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink } from 'lucide-react'
 
 export default function Admin() {
   const { user, isPastorAdmin } = useAuth()
@@ -41,6 +41,216 @@ export default function Admin() {
 
   // 5. Métricas y Alertas Globales
   const [unresolvedAlerts, setUnresolvedAlerts] = useState([])
+
+  // --- NUEVOS ESTADOS MVP 4 DEPORTES Y RECURSOS ---
+  const [sports, setSports] = useState([])
+  const [sportTitle, setSportTitle] = useState('')
+  const [sportDesc, setSportDesc] = useState('')
+  const [sportType, setSportType] = useState('Fútbol / Baby Fútbol')
+  const [sportDatetime, setSportDatetime] = useState('')
+  const [sportPlace, setSportPlace] = useState('')
+  const [sportLimitSlots, setSportLimitSlots] = useState(10)
+  const [editingSportId, setEditingSportId] = useState(null)
+
+  const [resources, setResources] = useState([])
+  const [recursoTitle, setRecursoTitle] = useState('')
+  const [recursoDesc, setRecursoDesc] = useState('')
+  const [recursoCategory, setRecursoCategory] = useState('Manuales')
+  const [recursoFileUrl, setRecursoFileUrl] = useState('')
+  const [editingRecursoId, setEditingRecursoId] = useState(null)
+
+  const fetchSportsAdmin = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sports_activities')
+        .select(`
+          *,
+          sports_registrations (
+            id,
+            profiles (
+              nombre
+            )
+          )
+        `)
+        .order('datetime', { ascending: true })
+      if (error) throw error
+      setSports(data || [])
+    } catch (err) {
+      console.error('Error fetching sports for admin:', err.message)
+    }
+  }
+
+  const fetchResourcesAdmin = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('recursos')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setResources(data || [])
+    } catch (err) {
+      console.error('Error fetching resources for admin:', err.message)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'deportes') {
+      fetchSportsAdmin()
+    } else if (activeTab === 'recursos') {
+      fetchResourcesAdmin()
+    }
+  }, [activeTab])
+
+  const handleSaveSport = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const sportData = {
+        title: sportTitle,
+        description: sportDesc,
+        sport_type: sportType,
+        datetime: new Date(sportDatetime).toISOString(),
+        place: sportPlace,
+        limit_slots: parseInt(sportLimitSlots)
+      }
+
+      if (editingSportId) {
+        const { error } = await supabase
+          .from('sports_activities')
+          .update(sportData)
+          .eq('id', editingSportId)
+        if (error) throw error
+        setSuccessMessage('¡Actividad deportiva actualizada con éxito!')
+      } else {
+        const { error } = await supabase
+          .from('sports_activities')
+          .insert(sportData)
+        if (error) throw error
+        setSuccessMessage('¡Actividad deportiva creada con éxito!')
+      }
+
+      setSportTitle('')
+      setSportDesc('')
+      setSportType('Fútbol / Baby Fútbol')
+      setSportDatetime('')
+      setSportPlace('')
+      setSportLimitSlots(10)
+      setEditingSportId(null)
+      await fetchSportsAdmin()
+    } catch (err) {
+      console.error(err)
+      setErrorMessage(err.message || 'Error al guardar la actividad deportiva.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEditSport = (sport) => {
+    setEditingSportId(sport.id)
+    setSportTitle(sport.title)
+    setSportDesc(sport.description)
+    setSportType(sport.sport_type)
+    // Convert to datetime-local format
+    const dt = new Date(sport.datetime)
+    const offset = dt.getTimezoneOffset() * 60000
+    const localISOTime = new Date(dt.getTime() - offset).toISOString().slice(0, 16)
+    setSportDatetime(localISOTime)
+    setSportPlace(sport.place)
+    setSportLimitSlots(sport.limit_slots)
+  }
+
+  const handleDeleteSport = async (id) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta actividad deportiva? Se eliminarán todas las inscripciones asociadas.')) return
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const { error } = await supabase
+        .from('sports_activities')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      setSuccessMessage('Actividad deportiva eliminada con éxito.')
+      await fetchSportsAdmin()
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al eliminar la actividad.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveRecurso = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const recursoData = {
+        title: recursoTitle,
+        description: recursoDesc,
+        category: recursoCategory,
+        file_url: recursoFileUrl
+      }
+
+      if (editingRecursoId) {
+        const { error } = await supabase
+          .from('recursos')
+          .update(recursoData)
+          .eq('id', editingRecursoId)
+        if (error) throw error
+        setSuccessMessage('¡Recurso actualizado con éxito!')
+      } else {
+        const { error } = await supabase
+          .from('recursos')
+          .insert(recursoData)
+        if (error) throw error
+        setSuccessMessage('¡Recurso publicado con éxito!')
+      }
+
+      setRecursoTitle('')
+      setRecursoDesc('')
+      setRecursoCategory('Manuales')
+      setRecursoFileUrl('')
+      setEditingRecursoId(null)
+      await fetchResourcesAdmin()
+    } catch (err) {
+      console.error(err)
+      setErrorMessage(err.message || 'Error al guardar el recurso.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEditRecurso = (res) => {
+    setEditingRecursoId(res.id)
+    setRecursoTitle(res.title)
+    setRecursoDesc(res.description)
+    setRecursoCategory(res.category)
+    setRecursoFileUrl(res.file_url)
+  }
+
+  const handleDeleteRecurso = async (id) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este recurso?')) return
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const { error } = await supabase
+        .from('recursos')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      setSuccessMessage('Recurso eliminado con éxito.')
+      await fetchResourcesAdmin()
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al eliminar el recurso.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Cargar datos administrativos generales
   const loadAdminData = async () => {
@@ -430,6 +640,28 @@ export default function Admin() {
         >
           <Activity className="w-4 h-4" />
           <span>Métricas y Alertas ({unresolvedAlerts.length})</span>
+        </button>
+        <button
+          onClick={() => { setActiveTab('deportes'); setSelectedUser(null); }}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
+            activeTab === 'deportes'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>Deportes</span>
+        </button>
+        <button
+          onClick={() => { setActiveTab('recursos'); setSelectedUser(null); }}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
+            activeTab === 'recursos'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Recursos</span>
         </button>
       </div>
 
@@ -1089,6 +1321,340 @@ export default function Admin() {
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* TAB 4: GESTIÓN DEPORTES */}
+      {activeTab === 'deportes' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Formulario de Actividad */}
+          <div className="glass rounded-3xl p-6 border border-slate-850 h-fit space-y-6">
+            <div>
+              <h3 className="text-lg font-bold font-display text-white">
+                {editingSportId ? 'Editar Actividad' : 'Nueva Actividad'}
+              </h3>
+              <p className="text-slate-400 text-xs mt-1">
+                Completa los detalles para convocar a un encuentro o torneo deportivo.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveSport} className="space-y-4">
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Título de la Actividad</label>
+                <input
+                  type="text"
+                  required
+                  value={sportTitle}
+                  onChange={(e) => setSportTitle(e.target.value)}
+                  placeholder="Ej: Torneo de Ping Pong Familiar"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Descripción</label>
+                <textarea
+                  required
+                  rows="3"
+                  value={sportDesc}
+                  onChange={(e) => setSportDesc(e.target.value)}
+                  placeholder="Detalles prácticos, qué llevar, etc..."
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs leading-relaxed"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 text-xs font-semibold mb-1.5">Deporte / Tipo</label>
+                  <select
+                    value={sportType}
+                    onChange={(e) => setSportType(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                  >
+                    <option value="Fútbol / Baby Fútbol">Fútbol / Baby Fútbol</option>
+                    <option value="Senderismo / Trekking">Senderismo / Trekking</option>
+                    <option value="Básquetbol">Básquetbol</option>
+                    <option value="Recreación Familiar">Recreación Familiar</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 text-xs font-semibold mb-1.5">Límite de Cupos</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={sportLimitSlots}
+                    onChange={(e) => setSportLimitSlots(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Fecha y Hora</label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={sportDatetime}
+                  onChange={(e) => setSportDatetime(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-805 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Lugar del Evento</label>
+                <input
+                  type="text"
+                  required
+                  value={sportPlace}
+                  onChange={(e) => setSportPlace(e.target.value)}
+                  placeholder="Ej: Gimnasio Bicentenario"
+                  className="w-full bg-slate-900 border border-slate-805 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-all text-xs font-display flex items-center justify-center space-x-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{editingSportId ? 'Guardar Cambios' : 'Publicar Actividad'}</span>
+                </button>
+                {editingSportId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingSportId(null)
+                      setSportTitle('')
+                      setSportDesc('')
+                      setSportType('Fútbol / Baby Fútbol')
+                      setSportDatetime('')
+                      setSportPlace('')
+                      setSportLimitSlots(10)
+                    }}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 py-2.5 px-4 rounded-xl transition-all text-xs font-semibold"
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* Listado de Actividades Deportivas */}
+          <div className="lg:col-span-2 space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 px-1">Actividades Programadas</h3>
+            {sports.length === 0 ? (
+              <div className="glass rounded-3xl p-8 text-center border border-slate-850">
+                <p className="text-slate-500 text-xs italic">No hay actividades registradas en la base de datos.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {sports.map((sport) => {
+                  const regCount = sport.sports_registrations?.length || 0
+                  return (
+                    <div key={sport.id} className="glass rounded-3xl p-6 border border-slate-850 space-y-4">
+                      <div className="flex justify-between items-start border-b border-slate-850/60 pb-3">
+                        <div>
+                          <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block">{sport.sport_type}</span>
+                          <h4 className="font-bold text-sm text-slate-200 mt-0.5">{sport.title}</h4>
+                          <p className="text-[10px] text-slate-400 mt-1">Lugar: {sport.place} | Cupos: {regCount} / {sport.limit_slots}</p>
+                        </div>
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <button
+                            onClick={() => handleEditSport(sport)}
+                            className="p-1.5 text-indigo-400 hover:bg-indigo-950/40 border border-indigo-500/10 rounded-lg hover:text-indigo-300 transition-all"
+                            title="Editar actividad"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSport(sport.id)}
+                            className="p-1.5 text-rose-400 hover:bg-rose-950/40 border border-rose-500/10 rounded-lg hover:text-rose-300 transition-all"
+                            title="Eliminar actividad"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Lista corta de inscritos */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider">Inscritos ({regCount}):</span>
+                        {regCount === 0 ? (
+                          <p className="text-[10.5px] text-slate-500 italic pl-1">Aún no hay inscripciones.</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {sport.sports_registrations.map((reg) => (
+                              <span 
+                                key={reg.id} 
+                                className="bg-slate-900 border border-slate-800 text-[10px] text-slate-300 px-2.5 py-1 rounded-lg font-medium"
+                              >
+                                {reg.profiles?.nombre || 'Miembro'}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: GESTIÓN RECURSOS */}
+      {activeTab === 'recursos' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Formulario de Recurso */}
+          <div className="glass rounded-3xl p-6 border border-slate-850 h-fit space-y-6">
+            <div>
+              <h3 className="text-lg font-bold font-display text-white">
+                {editingRecursoId ? 'Editar Recurso' : 'Nuevo Recurso'}
+              </h3>
+              <p className="text-slate-400 text-xs mt-1">
+                Agrega manuales, guías o el kit replicable a la biblioteca digital.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveRecurso} className="space-y-4">
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Título del Recurso</label>
+                <input
+                  type="text"
+                  required
+                  value={recursoTitle}
+                  onChange={(e) => setRecursoTitle(e.target.value)}
+                  placeholder="Ej: Manual del Discipulador"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Descripción Corta</label>
+                <textarea
+                  required
+                  rows="3"
+                  value={recursoDesc}
+                  onChange={(e) => setRecursoDesc(e.target.value)}
+                  placeholder="Breve descripción del contenido del archivo..."
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs leading-relaxed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Categoría</label>
+                <select
+                  value={recursoCategory}
+                  onChange={(e) => setRecursoCategory(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                >
+                  <option value="Manuales">Manuales</option>
+                  <option value="Escuela">Escuela de Líderes</option>
+                  <option value="Kit Replicable">Kit Replicable</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold mb-1.5">URL de Descarga del Archivo</label>
+                <input
+                  type="url"
+                  required
+                  value={recursoFileUrl}
+                  onChange={(e) => setRecursoFileUrl(e.target.value)}
+                  placeholder="https://ejemplo.com/recurso.pdf"
+                  className="w-full bg-slate-900 border border-slate-805 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-all text-xs font-display flex items-center justify-center space-x-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{editingRecursoId ? 'Guardar Cambios' : 'Publicar Recurso'}</span>
+                </button>
+                {editingRecursoId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingRecursoId(null)
+                      setRecursoTitle('')
+                      setRecursoDesc('')
+                      setRecursoCategory('Manuales')
+                      setRecursoFileUrl('')
+                    }}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 py-2.5 px-4 rounded-xl transition-all text-xs font-semibold"
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* Listado de Recursos */}
+          <div className="lg:col-span-2 space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 px-1">Biblioteca de Recursos</h3>
+            {resources.length === 0 ? (
+              <div className="glass rounded-3xl p-8 text-center border border-slate-850">
+                <p className="text-slate-500 text-xs italic">No hay recursos publicados en la base de datos.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {resources.map((res) => (
+                  <div key={res.id} className="glass rounded-3xl p-5 border border-slate-850 flex items-start justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center space-x-2">
+                        <span className="bg-indigo-950/20 border border-indigo-900/10 text-indigo-400 font-bold px-2 py-0.5 rounded-lg text-[9px] uppercase">
+                          {res.category === 'Escuela' ? 'Escuela de Líderes' : res.category}
+                        </span>
+                        <h4 className="font-bold text-xs text-slate-200">{res.title}</h4>
+                      </div>
+                      <p className="text-slate-400 text-[10.5px] leading-relaxed">{res.description}</p>
+                      <div className="flex items-center space-x-3 text-[10px] text-slate-500">
+                        <span>Descargas: {res.downloads_count}</span>
+                        <span>•</span>
+                        <a 
+                          href={res.file_url} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="text-indigo-400 hover:underline flex items-center space-x-0.5"
+                        >
+                          <span>Ver archivo</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <button
+                        onClick={() => handleEditRecurso(res)}
+                        className="p-1.5 text-indigo-400 hover:bg-indigo-950/40 border border-indigo-500/10 rounded-lg hover:text-indigo-300 transition-all"
+                        title="Editar recurso"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRecurso(res.id)}
+                        className="p-1.5 text-rose-400 hover:bg-rose-950/40 border border-rose-500/10 rounded-lg hover:text-rose-300 transition-all"
+                        title="Eliminar recurso"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

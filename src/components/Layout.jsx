@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, History, User, ShieldCheck, LogOut, Globe, Award } from 'lucide-react'
+import { BookOpen, History, User, ShieldCheck, LogOut, Globe, Award, Activity, FileText } from 'lucide-react'
 import OnboardingModal from './OnboardingModal'
 
 export default function Layout({ children }) {
@@ -14,6 +14,8 @@ export default function Layout({ children }) {
     { path: '/archive', label: 'Historial', icon: History },
     { path: '/misiones', label: 'Misiones', icon: Globe },
     { path: '/escuela', label: 'Escuela', icon: Award },
+    { path: '/deportes', label: 'Deportes', icon: Activity },
+    { path: '/recursos', label: 'Recursos', icon: FileText },
     { path: '/profile', label: 'Mi Perfil', icon: User },
   ]
 
