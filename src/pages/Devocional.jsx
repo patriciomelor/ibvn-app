@@ -147,17 +147,17 @@ https://vidanueva.app/`
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <Loader className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-        <p className="text-slate-400 text-sm">Cargando devocional del día...</p>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">Cargando devocional del día...</p>
       </div>
     )
   }
 
   if (!devocional) {
     return (
-      <div className="glass rounded-3xl p-8 text-center max-w-xl mx-auto my-12 border border-slate-800">
+      <div className="glass rounded-3xl p-8 text-center max-w-xl mx-auto my-12 border border-slate-200 dark:border-slate-800">
         <BookOpen className="w-16 h-16 text-indigo-500/50 mx-auto mb-4" />
-        <h3 className="text-xl font-bold font-display text-white mb-2">Aún no hay devocionales publicados</h3>
-        <p className="text-slate-400 text-sm mb-6">
+        <h3 className="text-xl font-bold font-display text-slate-900 dark:text-white mb-2">Aún no hay devocionales publicados</h3>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
           Los devocionales diarios se publican de forma semanal. Vuelve pronto para ver la nueva actualización.
         </p>
       </div>
@@ -184,13 +184,13 @@ https://vidanueva.app/`
       <div className="print:hidden space-y-8">
         
         {/* Cabecera del Devocional */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/40 p-6 rounded-3xl border border-slate-800/60">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/80 dark:bg-slate-900/40 p-6 rounded-3xl border border-slate-200/60 dark:border-slate-800/60">
           <div>
             <div className="flex items-center space-x-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-2">
               <Calendar className="w-4 h-4" />
               <span>Semana {devocional.semana}</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold font-display text-white leading-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold font-display text-slate-900 dark:text-white leading-tight">
               {devocional.titulo}
             </h2>
           </div>
@@ -207,7 +207,7 @@ https://vidanueva.app/`
             </button>
             <button
               onClick={handlePrint}
-              className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 px-3.5 py-2 rounded-xl text-xs font-medium transition-all active:scale-95"
+              className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-700/50 px-3.5 py-2 rounded-xl text-xs font-medium transition-all active:scale-95"
             >
               <Printer className="w-4 h-4" />
               <span className="hidden sm:inline">Imprimir / PDF</span>
@@ -222,7 +222,7 @@ https://vidanueva.app/`
             {/* Texto Bíblico */}
             <div className="glass-indigo rounded-3xl p-6 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
-              <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
+              <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
                 Pasaje Bíblico
               </h3>
               <p className="text-xl sm:text-2xl font-semibold text-indigo-300 font-display italic leading-relaxed">
@@ -232,11 +232,11 @@ https://vidanueva.app/`
             </div>
 
             {/* Reflexión Pastoral */}
-            <div className="glass rounded-3xl p-6 border border-slate-850">
-              <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">
+            <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850">
+              <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">
                 Reflexión
               </h3>
-              <p className="text-slate-200 leading-relaxed text-justify whitespace-pre-line text-sm sm:text-base">
+              <p className="text-slate-700 dark:text-slate-200 leading-relaxed text-justify whitespace-pre-line text-sm sm:text-base">
                 {devocional.reflexion}
               </p>
             </div>
@@ -255,10 +255,10 @@ https://vidanueva.app/`
 
           {/* SECCIÓN DEL DIARIO PERSONAL (Journaling) */}
           <div className="space-y-6">
-            <div className="glass rounded-3xl p-6 border border-slate-850 sticky top-6">
+            <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 sticky top-6">
               <div className="flex items-center space-x-2 mb-6">
                 <BookOpen className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-lg font-bold font-display text-white">Mi Diario Espiritual</h3>
+                <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white">Mi Diario Espiritual</h3>
               </div>
 
               {errorMessage && (
@@ -276,15 +276,15 @@ https://vidanueva.app/`
               )}
 
               {!user ? (
-                <div className="text-center py-6 px-4 bg-slate-900/60 rounded-2xl border border-slate-800/80 space-y-4">
+                <div className="text-center py-6 px-4 bg-white/80 dark:bg-slate-900/60 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 space-y-4">
                   <BookOpen className="w-10 h-10 text-indigo-400/50 mx-auto" />
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Diario Espiritual Privado</h4>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Diario Espiritual Privado</h4>
+                  <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed">
                     Inicia sesión o regístrate para llevar tu diario personal, anotar lo que Dios te enseña hoy y guardar tus motivos de oración.
                   </p>
                   <button
                     onClick={() => navigate('/login')}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-xl text-xs transition-all active:scale-[0.98] font-display"
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-2 rounded-xl text-xs transition-all active:scale-[0.98] font-display"
                   >
                     Iniciar Sesión
                   </button>
@@ -294,7 +294,7 @@ https://vidanueva.app/`
                   
                   {/* Bloque 1: Lo que Dios me dijo */}
                   <div>
-                    <label className="block text-slate-300 text-xs font-semibold mb-2">
+                    <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-2">
                       1. ¿Qué me enseñó Dios hoy? (Apreciación)
                     </label>
                     <textarea
@@ -302,13 +302,13 @@ https://vidanueva.app/`
                       value={journal.apreciacion}
                       onChange={(e) => setJournal({ ...journal, apreciacion: e.target.value })}
                       placeholder="Escribe lo que el pasaje o la reflexión hablaron a tu corazón..."
-                      className="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
+                      className="w-full bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
                     />
                   </div>
 
                   {/* Bloque 2: Cosas a cambiar */}
                   <div>
-                    <label className="block text-slate-300 text-xs font-semibold mb-2">
+                    <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-2">
                       2. ¿Qué decisiones prácticas debo tomar? (Cambios)
                     </label>
                     <textarea
@@ -316,13 +316,13 @@ https://vidanueva.app/`
                       value={journal.cambios}
                       onChange={(e) => setJournal({ ...journal, cambios: e.target.value })}
                       placeholder="Acciones o actitudes concretas que Dios te motiva a corregir o iniciar..."
-                      className="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
+                      className="w-full bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
                     />
                   </div>
 
                   {/* Bloque 3: Motivos de oración */}
                   <div>
-                    <label className="block text-slate-300 text-xs font-semibold mb-2">
+                    <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-2">
                       3. Mis Motivos de Oración
                     </label>
                     <textarea
@@ -330,14 +330,14 @@ https://vidanueva.app/`
                       value={journal.oracion_personal}
                       onChange={(e) => setJournal({ ...journal, oracion_personal: e.target.value })}
                       placeholder="Escribe tus peticiones de oración de hoy..."
-                      className="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
+                      className="w-full bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={saving}
-                    className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 text-xs font-display"
+                    className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 text-xs font-display"
                   >
                     {saving ? (
                       <>

@@ -20,7 +20,7 @@
 
 @layer base {
   body {
-    @apply font-sans bg-slate-950 text-slate-100 antialiased min-h-screen transition-colors duration-200;
+    @apply font-sans bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased min-h-screen transition-colors duration-200;
   }
 }
 
@@ -42,30 +42,46 @@
 
 /* Efectos de Glassmorphism */
 .glass {
-  background: rgba(30, 41, 59, 0.4);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+:is(.dark .glass) {
+  background: rgba(30, 41, 59, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .glass-indigo {
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(99, 102, 241, 0.05);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+}
+:is(.dark .glass-indigo) {
+  background: rgba(99, 102, 241, 0.1);
   border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
 .glass-emerald {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.05);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(16, 185, 129, 0.1);
+}
+:is(.dark .glass-emerald) {
+  background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .glass-rose {
-  background: rgba(244, 63, 94, 0.1);
+  background: rgba(244, 63, 94, 0.05);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(244, 63, 94, 0.1);
+}
+:is(.dark .glass-rose) {
+  background: rgba(244, 63, 94, 0.1);
   border: 1px solid rgba(244, 63, 94, 0.2);
 }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings } from 'lucide-react'
+import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera } from 'lucide-react'
 
 export default function Admin() {
   const { user, isPastorAdmin, moduleVisibility, refreshVisibility } = useAuth()
@@ -16,6 +16,12 @@ export default function Admin() {
   const [textoBiblico, setTextoBiblico] = useState('')
   const [reflexion, setReflexion] = useState('')
   const [oracion, setOracion] = useState('')
+
+  // 1.5 Datos del Generador IA
+  const [audioFile, setAudioFile] = useState(null)
+  const [isGeneratingIA, setIsGeneratingIA] = useState(false)
+  const [iaError, setIaError] = useState('')
+  const [iaStatus, setIaStatus] = useState('')
 
   // 2. Datos de Miembros y Catastro
   const [profiles, setProfiles] = useState([])
@@ -33,6 +39,7 @@ export default function Admin() {
   const [pastoralNotes, setPastoralNotes] = useState([])
   const [newNote, setNewNote] = useState('')
   const [loadingSubData, setLoadingSubData] = useState(false)
+  const [isUploadingAdminAvatar, setIsUploadingAdminAvatar] = useState(false)
 
   // 4. Formulario de Nueva Alerta
   const [alertTipo, setAlertTipo] = useState('Inactividad')
@@ -348,6 +355,65 @@ export default function Admin() {
     loadAdminData()
   }, [isPastorAdmin])
 
+  // Generar Devocional con IA
+  const handleGenerateIA = async () => {
+    if (!audioFile) {
+      setIaError('Por favor selecciona un archivo de audio.')
+      return
+    }
+    setIsGeneratingIA(true)
+    setIaError('')
+    
+    try {
+      // 1. Subir a Supabase
+      setIaStatus('1/2 Subiendo audio a la nube...')
+      const fileExt = audioFile.name.split('.').pop()
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+      const filePath = `devocionales/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('audio_uploads')
+        .upload(filePath, audioFile)
+
+      if (uploadError) throw new Error('Error al subir el audio: ' + uploadError.message)
+
+      // 2. Llamar API
+      setIaStatus('2/2 Procesando con Inteligencia Artificial (puede tomar hasta 30s)...')
+      const response = await fetch('/api/process-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath })
+      })
+
+      const result = await response.json()
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Error al procesar el audio.')
+      }
+
+      const { devocional } = result
+      
+      // 3. Rellenar formulario
+      setTitulo(devocional.titulo || '')
+      setTextoBiblico(`${devocional.versiculo_referencia || ''} - ${devocional.versiculo_texto || ''}`)
+      setReflexion(devocional.cuerpo_texto || '')
+      setOracion(devocional.frase_reflexion || '')
+      
+      setIaStatus('¡Generación completada con éxito!')
+      setTimeout(() => setIaStatus(''), 5000)
+      setAudioFile(null)
+      const input = document.getElementById('audio_upload_input')
+      if (input) input.value = ''
+      
+    } catch (err) {
+      console.error(err)
+      setIaError(err.message)
+      setIaStatus('')
+    } finally {
+      setIsGeneratingIA(false)
+    }
+  }
+
   // Crear Devocional
   const handleCreateDevotional = async (e) => {
     e.preventDefault()
@@ -474,6 +540,60 @@ export default function Admin() {
       setErrorMessage('Ocurrió un error al actualizar el miembro.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Subir Avatar de un Miembro (Admin)
+  const handleAdminAvatarUpload = async (event, memberId) => {
+    try {
+      setIsUploadingAdminAvatar(true)
+      setErrorMessage('')
+      
+      const file = event.target.files[0]
+      if (!file) return
+      
+      if (file.size > 2 * 1024 * 1024) {
+        setErrorMessage('La imagen no puede pesar más de 2MB')
+        return
+      }
+
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${memberId}-${Math.random()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      // Upload to Storage
+      let { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      // Update Profile
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', memberId)
+
+      if (updateErr) throw updateErr
+
+      setSuccessMessage('Foto de perfil actualizada con éxito.')
+      
+      // Update selectedUser locally to reflect changes
+      setSelectedUser(prev => ({ ...prev, avatar_url: publicUrl }))
+      await loadAdminData() // Refresh lists
+      
+    } catch (error) {
+      console.error(error)
+      setErrorMessage('Error subiendo la imagen: ' + error.message)
+    } finally {
+      setIsUploadingAdminAvatar(false)
+      // reset input
+      event.target.value = ''
     }
   }
 
@@ -622,7 +742,7 @@ export default function Admin() {
     return (
       <div className="glass-rose p-8 rounded-3xl text-center max-w-xl mx-auto my-12 border border-rose-500/20">
         <ShieldAlert className="w-16 h-16 text-rose-500 mx-auto mb-4" />
-        <h3 className="text-xl font-bold font-display text-white mb-2">Acceso Denegado</h3>
+        <h3 className="text-xl font-bold font-display text-slate-900 dark:text-white mb-2">Acceso Denegado</h3>
         <p className="text-rose-300/80 text-sm">
           Esta zona es de carácter restringido y solo está disponible para los Pastores y Administradores de la Iglesia Bautista Vida Nueva.
         </p>
@@ -635,8 +755,8 @@ export default function Admin() {
       {/* Cabecera */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold font-display text-white tracking-tight">Panel de Administración</h2>
-          <p className="text-slate-400 text-sm mt-1">Gestión pastoral integral, publicaciones y estadísticas del ministerio.</p>
+          <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight">Panel de Administración</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gestión pastoral integral, publicaciones y estadísticas del ministerio.</p>
         </div>
         
         {/* Exportador */}
@@ -650,13 +770,13 @@ export default function Admin() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-800 gap-2 overflow-x-auto pb-0.5">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 overflow-x-auto pb-0.5">
         <button
           onClick={() => { setActiveTab('devocional'); setSelectedUser(null); }}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
             activeTab === 'devocional'
               ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
           }`}
         >
           <BookOpen className="w-4 h-4" />
@@ -667,7 +787,7 @@ export default function Admin() {
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
             activeTab === 'crm'
               ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
           }`}
         >
           <UserCheck className="w-4 h-4" />
@@ -678,7 +798,7 @@ export default function Admin() {
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
             activeTab === 'metricas'
               ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
           }`}
         >
           <Activity className="w-4 h-4" />
@@ -689,7 +809,7 @@ export default function Admin() {
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
             activeTab === 'deportes'
               ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
           }`}
         >
           <Calendar className="w-4 h-4" />
@@ -700,7 +820,7 @@ export default function Admin() {
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
             activeTab === 'recursos'
               ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
           }`}
         >
           <FileText className="w-4 h-4" />
@@ -711,7 +831,7 @@ export default function Admin() {
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
             activeTab === 'usuarios'
               ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
           }`}
         >
           <Users className="w-4 h-4" />
@@ -722,7 +842,7 @@ export default function Admin() {
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
             activeTab === 'configuracion'
               ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
           }`}
         >
           <Settings className="w-4 h-4" />
@@ -747,16 +867,64 @@ export default function Admin() {
 
       {/* TAB 1: PUBLICAR DEVOCIONAL */}
       {activeTab === 'devocional' && (
-        <div className="glass rounded-3xl p-6 border border-slate-850">
-          <h3 className="text-lg font-bold font-display text-white mb-6 flex items-center space-x-2">
+        <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850">
+          <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
             <PlusCircle className="w-5 h-5 text-indigo-400" />
             <span>Crear Devocional Semanal</span>
           </h3>
 
+          {/* Módulo IA */}
+          <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl p-5 mb-8">
+            <h4 className="text-sm font-bold font-display text-indigo-900 dark:text-indigo-300 mb-2 flex items-center space-x-2">
+              <Wand2 className="w-4 h-4" />
+              <span>Generar desde Audio (IA)</span>
+            </h4>
+            <p className="text-xs text-indigo-700/70 dark:text-indigo-400/70 mb-4">
+              Sube el audio del devocional y la inteligencia artificial lo transcribirá y redactará el borrador por ti.
+            </p>
+            
+            {iaError && (
+              <div className="flex items-center space-x-2 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 p-3 rounded-lg text-xs mb-4">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{iaError}</span>
+              </div>
+            )}
+            
+            {iaStatus && (
+              <div className="flex items-center space-x-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 p-3 rounded-lg text-xs mb-4">
+                <CheckCircle className="w-4 h-4 shrink-0" />
+                <span>{iaStatus}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <input
+                id="audio_upload_input"
+                type="file"
+                accept="audio/*"
+                onChange={(e) => setAudioFile(e.target.files[0])}
+                className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/50 dark:file:text-indigo-300"
+              />
+              <button
+                type="button"
+                onClick={handleGenerateIA}
+                disabled={isGeneratingIA || !audioFile}
+                className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-medium py-2 px-4 rounded-xl transition-all disabled:opacity-50 text-xs shadow-sm"
+              >
+                {isGeneratingIA ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <UploadCloud className="w-4 h-4" />
+                )}
+                <span>{isGeneratingIA ? 'Generando...' : 'Generar Borrador'}</span>
+              </button>
+            </div>
+          </div>
+
           <form onSubmit={handleCreateDevotional} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div>
-                <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                   Semana del Año
                 </label>
                 <input
@@ -764,12 +932,12 @@ export default function Admin() {
                   required
                   value={semana}
                   onChange={(e) => setSemana(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                   Título del Devocional
                 </label>
                 <input
@@ -778,13 +946,13 @@ export default function Admin() {
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
                   placeholder="La Fidelidad en el Desierto"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+              <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                 Texto Bíblico Clave (LBLA)
               </label>
               <input
@@ -793,12 +961,12 @@ export default function Admin() {
                 value={textoBiblico}
                 onChange={(e) => setTextoBiblico(e.target.value)}
                 placeholder="Génesis 15:6"
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 px-4 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+              <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                 Reflexión Pastoral
               </label>
               <textarea
@@ -807,12 +975,12 @@ export default function Admin() {
                 value={reflexion}
                 onChange={(e) => setReflexion(e.target.value)}
                 placeholder="Escribe la reflexión del devocional aquí..."
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm leading-relaxed"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm leading-relaxed"
               />
             </div>
 
             <div>
-              <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+              <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                 Oración de Cierre / Guía
               </label>
               <textarea
@@ -821,14 +989,14 @@ export default function Admin() {
                 value={oracion}
                 onChange={(e) => setOracion(e.target.value)}
                 placeholder="Señor Jesús, te pedimos..."
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm leading-relaxed"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm leading-relaxed"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 text-sm font-display"
+              className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 text-sm font-display"
             >
               {loading ? (
                 <>
@@ -852,8 +1020,8 @@ export default function Admin() {
           
           {/* Listado y Filtros Avanzados */}
           <div className="lg:col-span-1 space-y-4">
-            <div className="glass rounded-3xl p-5 border border-slate-850 space-y-4">
-              <h3 className="text-sm font-bold font-display text-white">Catastro y Búsqueda</h3>
+            <div className="glass rounded-3xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
+              <h3 className="text-sm font-bold font-display text-slate-900 dark:text-white">Catastro y Búsqueda</h3>
               
               {/* Buscador */}
               <div className="relative">
@@ -863,18 +1031,18 @@ export default function Admin() {
                   placeholder="Buscar por nombre o mail..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs"
                 />
               </div>
 
               {/* Filtros */}
-              <div className="space-y-3 pt-2 border-t border-slate-850">
+              <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-850">
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Filtrar por Rol</label>
                   <select
                     value={filterRol}
                     onChange={(e) => setFilterRol(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 px-3 text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
                   >
                     <option value="">Todos los roles</option>
                     <option value="miembro">Miembro</option>
@@ -888,7 +1056,7 @@ export default function Admin() {
                   <select
                     value={filterCelula}
                     onChange={(e) => setFilterCelula(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 px-3 text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
                   >
                     <option value="">Todas las células</option>
                     {celulas.map(c => (
@@ -902,7 +1070,7 @@ export default function Admin() {
                   <select
                     value={filterMinisterio}
                     onChange={(e) => setFilterMinisterio(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 px-3 text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
                   >
                     <option value="">Todos los ministerios</option>
                     {ministerios.map(m => (
@@ -914,7 +1082,7 @@ export default function Admin() {
             </div>
 
             {/* Listado Resultante */}
-            <div className="glass rounded-3xl overflow-hidden border border-slate-850 max-h-[350px] overflow-y-auto">
+            <div className="glass rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-850 max-h-[350px] overflow-y-auto">
               <div className="divide-y divide-slate-850">
                 {filteredProfiles.length === 0 ? (
                   <p className="text-slate-500 text-xs italic text-center py-6">No se encontraron miembros.</p>
@@ -924,11 +1092,11 @@ export default function Admin() {
                       key={member.id}
                       onClick={() => handleSelectUserCRM(member)}
                       className={`w-full text-left px-5 py-3.5 flex items-center justify-between gap-3 transition-colors ${
-                        selectedUser?.id === member.id ? 'bg-indigo-600/10' : 'hover:bg-slate-900/20'
+                        selectedUser?.id === member.id ? 'bg-indigo-600/10' : 'hover:bg-white dark:bg-slate-900/20'
                       }`}
                     >
                       <div>
-                        <p className="font-semibold text-slate-200 text-xs">{member.nombre}</p>
+                        <p className="font-semibold text-slate-700 dark:text-slate-200 text-xs">{member.nombre}</p>
                         <span className="text-[10px] text-slate-500 capitalize">{member.rol}</span>
                       </div>
                       <ChevronRight className="w-4 h-4 text-slate-600" />
@@ -942,27 +1110,35 @@ export default function Admin() {
           {/* Ficha Detallada del Miembro */}
           <div className="lg:col-span-2 space-y-6">
             {selectedUser ? (
-              <div className="glass rounded-3xl p-6 border border-slate-850 space-y-6">
+              <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-6">
                 
                 {/* Cabecera Ficha */}
-                <div className="flex items-center justify-between border-b border-slate-850 pb-4">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-850 pb-4">
                   <div className="flex items-center space-x-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/20 flex items-center justify-center font-bold text-indigo-400 font-display text-lg">
-                      {selectedUser.nombre.charAt(0).toUpperCase()}
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/20 flex items-center justify-center font-bold text-indigo-400 font-display text-lg overflow-hidden relative group shrink-0">
+                      {selectedUser.avatar_url ? (
+                        <img src={selectedUser.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        selectedUser.nombre.charAt(0).toUpperCase()
+                      )}
+                      <label className="absolute inset-0 bg-slate-900/60 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity" title="Cambiar foto (Admin)">
+                        {isUploadingAdminAvatar ? <Loader className="w-4 h-4 text-white animate-spin" /> : <Camera className="w-4 h-4 text-white" />}
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAdminAvatarUpload(e, selectedUser.id)} disabled={isUploadingAdminAvatar} />
+                      </label>
                     </div>
                     <div>
-                      <h4 className="text-lg font-bold font-display text-white leading-tight">{selectedUser.nombre}</h4>
-                      <p className="text-xs text-slate-400">{selectedUser.email}</p>
+                      <h4 className="text-lg font-bold font-display text-slate-900 dark:text-white leading-tight">{selectedUser.nombre}</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{selectedUser.email}</p>
                     </div>
                   </div>
 
-                  <span className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-indigo-400 uppercase tracking-wider">
+                  <span className="text-xs font-semibold px-3 py-1 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-indigo-400 uppercase tracking-wider">
                     {selectedUser.rol}
                   </span>
                 </div>
 
                 {/* Sub-Tabs de Ficha */}
-                <div className="flex border-b border-slate-850 gap-4 text-xs font-semibold">
+                <div className="flex border-b border-slate-200 dark:border-slate-850 gap-4 text-xs font-semibold">
                   {[
                     { id: 'info', label: 'Información' },
                     { id: 'discipulado', label: 'Discipulado' },
@@ -973,7 +1149,7 @@ export default function Admin() {
                       key={tab.id}
                       onClick={() => setCrmTab(tab.id)}
                       className={`pb-2 border-b-2 transition-all ${
-                        crmTab === tab.id ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+                        crmTab === tab.id ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
                       }`}
                     >
                       {tab.label}
@@ -990,7 +1166,7 @@ export default function Admin() {
                         type="text"
                         value={selectedUser.tel || ''}
                         onChange={(e) => setSelectedUser({ ...selectedUser, tel: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 px-3 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-700 dark:text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
                       />
                     </div>
                     <div>
@@ -999,7 +1175,7 @@ export default function Admin() {
                         type="text"
                         value={selectedUser.direccion || ''}
                         onChange={(e) => setSelectedUser({ ...selectedUser, direccion: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 px-3 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-700 dark:text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
                       />
                     </div>
                     <div>
@@ -1007,7 +1183,7 @@ export default function Admin() {
                       <select
                         value={selectedUser.celula_id || ''}
                         onChange={(e) => setSelectedUser({ ...selectedUser, celula_id: e.target.value ? parseInt(e.target.value) : null })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2.5 px-3 text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
                       >
                         <option value="">Sin Asignar</option>
                         {celulas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -1018,7 +1194,7 @@ export default function Admin() {
                       <select
                         value={selectedUser.ministerio_id || ''}
                         onChange={(e) => setSelectedUser({ ...selectedUser, ministerio_id: e.target.value ? parseInt(e.target.value) : null })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2.5 px-3 text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
                       >
                         <option value="">Sin Asignar</option>
                         {ministerios.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
@@ -1030,15 +1206,15 @@ export default function Admin() {
                         type="text"
                         value={selectedUser.como_llego || ''}
                         onChange={(e) => setSelectedUser({ ...selectedUser, como_llego: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 px-3 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-700 dark:text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
                       />
                     </div>
 
-                    <div className="sm:col-span-2 pt-2 border-t border-slate-850 flex items-center justify-between">
+                    <div className="sm:col-span-2 pt-2 border-t border-slate-200 dark:border-slate-850 flex items-center justify-between">
                       <button
                         type="submit"
                         disabled={loading}
-                        className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-5 rounded-xl transition-all disabled:opacity-50 text-xs font-display"
+                        className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-2.5 px-5 rounded-xl transition-all disabled:opacity-50 text-xs font-display"
                       >
                         <Save className="w-3.5 h-3.5" />
                         <span>Guardar Cambios</span>
@@ -1063,11 +1239,11 @@ export default function Admin() {
                     <h5 className="font-bold text-xs text-rose-300 uppercase tracking-wide">Nueva Alerta de Seguimiento Pastoral</h5>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-slate-400 text-[9px] font-bold uppercase tracking-wider mb-1">Categoría</label>
+                        <label className="block text-slate-500 dark:text-slate-400 text-[9px] font-bold uppercase tracking-wider mb-1">Categoría</label>
                         <select
                           value={alertTipo}
                           onChange={(e) => setAlertTipo(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-850 rounded-lg py-1.5 px-2.5 text-slate-200 focus:outline-none text-xs"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-lg py-1.5 px-2.5 text-slate-700 dark:text-slate-200 focus:outline-none text-xs"
                         >
                           <option value="Inactividad">Inactividad</option>
                           <option value="Apoyo Espiritual">Apoyo Espiritual</option>
@@ -1076,28 +1252,28 @@ export default function Admin() {
                         </select>
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="block text-slate-400 text-[9px] font-bold uppercase tracking-wider mb-1">Descripción del caso</label>
+                        <label className="block text-slate-500 dark:text-slate-400 text-[9px] font-bold uppercase tracking-wider mb-1">Descripción del caso</label>
                         <input
                           type="text"
                           required
                           value={alertDesc}
                           onChange={(e) => setAlertDesc(e.target.value)}
                           placeholder="Hermano ausente en células por 3 semanas consecutivas..."
-                          className="w-full bg-slate-950 border border-slate-850 rounded-lg py-1.5 px-2.5 text-slate-200 focus:outline-none text-xs"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-lg py-1.5 px-2.5 text-slate-700 dark:text-slate-200 focus:outline-none text-xs"
                         />
                       </div>
                     </div>
                     <div className="flex justify-end space-x-2">
                       <button
                         type="submit"
-                        className="bg-rose-600 hover:bg-rose-500 text-white font-medium py-1.5 px-4 rounded-lg text-xs"
+                        className="bg-rose-600 hover:bg-rose-500 text-slate-900 dark:text-white font-medium py-1.5 px-4 rounded-lg text-xs"
                       >
                         Crear Alerta
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowAlertForm(false)}
-                        className="bg-slate-800 text-slate-300 border border-slate-700 py-1.5 px-3 rounded-lg text-xs"
+                        className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-700 py-1.5 px-3 rounded-lg text-xs"
                       >
                         Cancelar
                       </button>
@@ -1116,7 +1292,7 @@ export default function Admin() {
                         <select
                           value={selectedUser.rol}
                           onChange={(e) => setSelectedUser({ ...selectedUser, rol: e.target.value })}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2.5 px-3 text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
                         >
                           <option value="miembro">Miembro / Asistente</option>
                           <option value="lider">Líder de Ministerio / Célula</option>
@@ -1129,7 +1305,7 @@ export default function Admin() {
                         <select
                           value={selectedUser.mentor_id || ''}
                           onChange={(e) => setSelectedUser({ ...selectedUser, mentor_id: e.target.value || null })}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2.5 px-3 text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
                         >
                           <option value="">Sin Asignar</option>
                           {profiles
@@ -1142,8 +1318,8 @@ export default function Admin() {
                     </div>
 
                     {/* Hitos y Clases */}
-                    <div className="border-t border-slate-850 pt-4 space-y-4">
-                      <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5">
+                    <div className="border-t border-slate-200 dark:border-slate-850 pt-4 space-y-4">
+                      <label className="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5">
                         <Award className="w-4 h-4 text-indigo-400" />
                         <span>Requisitos Aprobados</span>
                       </label>
@@ -1162,7 +1338,7 @@ export default function Admin() {
                             { key: 'dones', label: 'Clase 4: Descubre tus Dones' },
                             { key: 'aplicadas', label: 'Clase 5: Herramientas Aplicadas' }
                           ].map((item) => (
-                            <label key={item.key} className="flex items-center space-x-2.5 bg-slate-900/55 p-3 rounded-xl border border-slate-850 text-xs font-medium cursor-pointer select-none text-slate-300 hover:text-slate-100">
+                            <label key={item.key} className="flex items-center space-x-2.5 bg-white dark:bg-slate-900/55 p-3 rounded-xl border border-slate-200 dark:border-slate-850 text-xs font-medium cursor-pointer select-none text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:text-slate-100">
                               <input
                                 type="checkbox"
                                 checked={selectedUserSpiritual[item.key]}
@@ -1170,7 +1346,7 @@ export default function Admin() {
                                   ...selectedUserSpiritual,
                                   [item.key]: e.target.checked
                                 })}
-                                className="rounded border-slate-800 text-indigo-600 focus:ring-indigo-500 bg-slate-900 w-4 h-4 cursor-pointer"
+                                className="rounded border-slate-200 dark:border-slate-800 text-indigo-600 focus:ring-indigo-500 bg-white dark:bg-slate-900 w-4 h-4 cursor-pointer"
                               />
                               <span>{item.label}</span>
                             </label>
@@ -1179,11 +1355,11 @@ export default function Admin() {
                       ) : null}
                     </div>
 
-                    <div className="pt-4 border-t border-slate-850">
+                    <div className="pt-4 border-t border-slate-200 dark:border-slate-850">
                       <button
                         type="submit"
                         disabled={loading}
-                        className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-5 rounded-xl transition-all disabled:opacity-50 text-xs font-display"
+                        className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-2.5 px-5 rounded-xl transition-all disabled:opacity-50 text-xs font-display"
                       >
                         <Save className="w-3.5 h-3.5" />
                         <span>Guardar Cambios</span>
@@ -1195,13 +1371,13 @@ export default function Admin() {
                 {/* SUB-TAB C: HISTORIAL Y LÍNEA DE TIEMPO */}
                 {crmTab === 'historial' && (
                   <div className="space-y-6 animate-fade-in">
-                    <h5 className="font-bold text-xs text-slate-400 uppercase tracking-wide">Línea de Tiempo de Progreso Espiritual</h5>
+                    <h5 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Línea de Tiempo de Progreso Espiritual</h5>
                     
-                    <div className="relative border-l border-slate-800 ml-3.5 pl-6 space-y-6 text-xs">
+                    <div className="relative border-l border-slate-200 dark:border-slate-800 ml-3.5 pl-6 space-y-6 text-xs">
                       {/* 1. Registro */}
                       <div className="relative">
                         <div className="absolute -left-[30px] top-0.5 w-4.5 h-4.5 rounded-full bg-indigo-500 border-4 border-slate-950"></div>
-                        <p className="font-bold text-slate-200">Se registró en la aplicación</p>
+                        <p className="font-bold text-slate-700 dark:text-slate-200">Se registró en la aplicación</p>
                         <p className="text-[10px] text-slate-500">{new Date(selectedUser.created_at).toLocaleDateString('es-CL')}</p>
                       </div>
 
@@ -1209,7 +1385,7 @@ export default function Admin() {
                       {selectedUserSpiritual?.bautizado && (
                         <div className="relative">
                           <div className="absolute -left-[30px] top-0.5 w-4.5 h-4.5 rounded-full bg-emerald-500 border-4 border-slate-950"></div>
-                          <p className="font-bold text-slate-200">Paso de fe: Bautismo en Agua</p>
+                          <p className="font-bold text-slate-700 dark:text-slate-200">Paso de fe: Bautismo en Agua</p>
                           <p className="text-[10px] text-slate-500">Registrado en la base de discipulado.</p>
                         </div>
                       )}
@@ -1230,7 +1406,7 @@ export default function Admin() {
                         return (
                           <div key={clsKey} className="relative">
                             <div className="absolute -left-[30px] top-0.5 w-4.5 h-4.5 rounded-full bg-indigo-500 border-4 border-slate-950"></div>
-                            <p className="font-bold text-slate-200">{labelMap[clsKey]}</p>
+                            <p className="font-bold text-slate-700 dark:text-slate-200">{labelMap[clsKey]}</p>
                             <p className="text-[10px] text-slate-500">Nivel de discipulado aprobado por el equipo de mentores.</p>
                           </div>
                         )
@@ -1240,7 +1416,7 @@ export default function Admin() {
                       {selectedUser.ministerio_id && (
                         <div className="relative">
                           <div className="absolute -left-[30px] top-0.5 w-4.5 h-4.5 rounded-full bg-indigo-400 border-4 border-slate-950"></div>
-                          <p className="font-bold text-slate-200">Incorporación ministerial</p>
+                          <p className="font-bold text-slate-700 dark:text-slate-200">Incorporación ministerial</p>
                           <p className="text-[10px] text-indigo-400 font-semibold">Sirviendo en: {selectedUser.ministerios?.nombre}</p>
                         </div>
                       )}
@@ -1251,7 +1427,7 @@ export default function Admin() {
                 {/* SUB-TAB D: NOTAS PASTORALES PRIVADAS */}
                 {crmTab === 'notas' && (
                   <div className="space-y-6 animate-fade-in">
-                    <h5 className="font-bold text-xs text-slate-400 uppercase tracking-wide">Bitácora de Notas Pastorales (Confidencial)</h5>
+                    <h5 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Bitácora de Notas Pastorales (Confidencial)</h5>
 
                     {/* Redactar Nota */}
                     <form onSubmit={handleAddPastoralNote} className="space-y-3">
@@ -1261,12 +1437,12 @@ export default function Admin() {
                         value={newNote}
                         onChange={(e) => setNewNote(e.target.value)}
                         placeholder="Registrar notas de consejería, visitas pastorales, o acuerdos de discipulado confidenciales..."
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-650 focus:outline-none focus:border-indigo-500 text-xs leading-relaxed"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-650 focus:outline-none focus:border-indigo-500 text-xs leading-relaxed"
                       />
                       <button
                         type="submit"
                         disabled={loadingSubData || !newNote.trim()}
-                        className="flex items-center space-x-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium py-2 px-4 rounded-xl text-xs font-display"
+                        className="flex items-center space-x-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-slate-900 dark:text-white font-medium py-2 px-4 rounded-xl text-xs font-display"
                       >
                         <MessageSquare className="w-4 h-4" />
                         <span>Añadir Nota</span>
@@ -1274,7 +1450,7 @@ export default function Admin() {
                     </form>
 
                     {/* Feed de Notas */}
-                    <div className="space-y-4 pt-4 border-t border-slate-850">
+                    <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-850">
                       {loadingSubData ? (
                         <div className="flex items-center justify-center py-6">
                           <Loader className="w-6 h-6 text-indigo-500 animate-spin" />
@@ -1283,12 +1459,12 @@ export default function Admin() {
                         <p className="text-slate-500 text-xs italic text-center py-4">No se han registrado notas pastorales para este miembro todavía.</p>
                       ) : (
                         pastoralNotes.map((note) => (
-                          <div key={note.id} className="bg-slate-900/60 border border-slate-850 p-4 rounded-xl text-xs space-y-2">
-                            <div className="flex justify-between items-center text-[10px] text-slate-500 border-b border-slate-850/50 pb-1.5 font-bold">
+                          <div key={note.id} className="bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-850 p-4 rounded-xl text-xs space-y-2">
+                            <div className="flex justify-between items-center text-[10px] text-slate-500 border-b border-slate-200 dark:border-slate-850/50 pb-1.5 font-bold">
                               <span>Registrado por: {note.author?.nombre || 'Pastor/Admin'}</span>
                               <span>{new Date(note.created_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
-                            <p className="text-slate-300 leading-relaxed text-justify whitespace-pre-line">
+                            <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-justify whitespace-pre-line">
                               {note.content}
                             </p>
                           </div>
@@ -1300,9 +1476,9 @@ export default function Admin() {
 
               </div>
             ) : (
-              <div className="glass rounded-3xl p-12 border border-slate-850 text-center py-24">
+              <div className="glass rounded-3xl p-12 border border-slate-200 dark:border-slate-850 text-center py-24">
                 <UserCheck className="w-16 h-16 text-slate-700 mx-auto mb-4" />
-                <h4 className="font-bold text-white text-md">Ficha del Miembro</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white text-md">Ficha del Miembro</h4>
                 <p className="text-slate-500 text-xs max-w-sm mx-auto mt-2">
                   Selecciona a un miembro del catastro de búsqueda lateral para ver su información personal, clases de discipulado, línea de tiempo espiritual y notas de consejería pastoral.
                 </p>
@@ -1319,10 +1495,10 @@ export default function Admin() {
           
           {/* Alertas Pastorales Activas */}
           <div className="lg:col-span-2 space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 px-1">Alertas Pastorales de Seguimiento Activas</h3>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">Alertas Pastorales de Seguimiento Activas</h3>
             
             {unresolvedAlerts.length === 0 ? (
-              <div className="glass rounded-3xl p-8 text-center border border-slate-850">
+              <div className="glass rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-850">
                 <p className="text-slate-500 text-xs italic">No hay alertas de seguimiento activas. ¡Excelente!</p>
               </div>
             ) : (
@@ -1334,7 +1510,7 @@ export default function Admin() {
                         <span className="bg-rose-500/20 border border-rose-500/30 text-rose-300 font-bold px-2 py-0.5 rounded-lg text-[9px] uppercase">
                           {alert.tipo}
                         </span>
-                        <h4 className="font-bold text-white">{alert.profiles?.nombre}</h4>
+                        <h4 className="font-bold text-slate-900 dark:text-white">{alert.profiles?.nombre}</h4>
                       </div>
                       <p className="text-rose-300/80 leading-relaxed text-justify">
                         {alert.descripcion}
@@ -1346,7 +1522,7 @@ export default function Admin() {
 
                     <button
                       onClick={() => handleResolveAlert(alert.id)}
-                      className="flex items-center space-x-1 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white py-1.5 px-3 rounded-lg shadow-md transition-all active:scale-95 shrink-0"
+                      className="flex items-center space-x-1 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-slate-900 dark:text-white py-1.5 px-3 rounded-lg shadow-md transition-all active:scale-95 shrink-0"
                     >
                       <CheckSquare className="w-3.5 h-3.5" />
                       <span>Resolver Alerta</span>
@@ -1359,27 +1535,27 @@ export default function Admin() {
 
           {/* Estadísticas Generales */}
           <div className="space-y-6">
-            <div className="glass rounded-3xl p-6 border border-slate-850 space-y-4">
-              <h3 className="text-md font-bold font-display text-white">Métricas de la Congregación</h3>
+            <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-4">
+              <h3 className="text-md font-bold font-display text-slate-900 dark:text-white">Métricas de la Congregación</h3>
               
               <div className="space-y-3.5">
-                <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-850/80">
-                  <span className="text-xs text-slate-400 font-medium">Registrados Totales</span>
-                  <span className="text-sm font-bold text-white">{statsTotal}</span>
+                <div className="flex items-center justify-between p-3.5 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-850/80">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Registrados Totales</span>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">{statsTotal}</span>
                 </div>
                 
-                <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-850/80">
-                  <span className="text-xs text-slate-400 font-medium">Miembros / Asistentes</span>
+                <div className="flex items-center justify-between p-3.5 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-850/80">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Miembros / Asistentes</span>
                   <span className="text-sm font-bold text-indigo-400">{statsMiembros}</span>
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-850/80">
-                  <span className="text-xs text-slate-400 font-medium">Líderes Activos</span>
+                <div className="flex items-center justify-between p-3.5 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-850/80">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Líderes Activos</span>
                   <span className="text-sm font-bold text-indigo-300">{statsLideres}</span>
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-850/80">
-                  <span className="text-xs text-slate-400 font-medium">Cuerpo Pastoral (Pastores)</span>
+                <div className="flex items-center justify-between p-3.5 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-850/80">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Cuerpo Pastoral (Pastores)</span>
                   <span className="text-sm font-bold text-rose-400">{statsPastores}</span>
                 </div>
               </div>
@@ -1393,48 +1569,48 @@ export default function Admin() {
       {activeTab === 'deportes' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Formulario de Actividad */}
-          <div className="glass rounded-3xl p-6 border border-slate-850 h-fit space-y-6">
+          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 h-fit space-y-6">
             <div>
-              <h3 className="text-lg font-bold font-display text-white">
+              <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white">
                 {editingSportId ? 'Editar Actividad' : 'Nueva Actividad'}
               </h3>
-              <p className="text-slate-400 text-xs mt-1">
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
                 Completa los detalles para convocar a un encuentro o torneo deportivo.
               </p>
             </div>
 
             <form onSubmit={handleSaveSport} className="space-y-4">
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Título de la Actividad</label>
+                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Título de la Actividad</label>
                 <input
                   type="text"
                   required
                   value={sportTitle}
                   onChange={(e) => setSportTitle(e.target.value)}
                   placeholder="Ej: Torneo de Ping Pong Familiar"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Descripción</label>
+                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Descripción</label>
                 <textarea
                   required
                   rows="3"
                   value={sportDesc}
                   onChange={(e) => setSportDesc(e.target.value)}
                   placeholder="Detalles prácticos, qué llevar, etc..."
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs leading-relaxed"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs leading-relaxed"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-300 text-xs font-semibold mb-1.5">Deporte / Tipo</label>
+                  <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Deporte / Tipo</label>
                   <select
                     value={sportType}
                     onChange={(e) => setSportType(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
                   >
                     <option value="Fútbol / Baby Fútbol">Fútbol / Baby Fútbol</option>
                     <option value="Senderismo / Trekking">Senderismo / Trekking</option>
@@ -1444,38 +1620,38 @@ export default function Admin() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 text-xs font-semibold mb-1.5">Límite de Cupos</label>
+                  <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Límite de Cupos</label>
                   <input
                     type="number"
                     required
                     min="1"
                     value={sportLimitSlots}
                     onChange={(e) => setSportLimitSlots(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Fecha y Hora</label>
+                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Fecha y Hora</label>
                 <input
                   type="datetime-local"
                   required
                   value={sportDatetime}
                   onChange={(e) => setSportDatetime(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-805 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-805 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Lugar del Evento</label>
+                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Lugar del Evento</label>
                 <input
                   type="text"
                   required
                   value={sportPlace}
                   onChange={(e) => setSportPlace(e.target.value)}
                   placeholder="Ej: Gimnasio Bicentenario"
-                  className="w-full bg-slate-900 border border-slate-805 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-805 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
                 />
               </div>
 
@@ -1483,7 +1659,7 @@ export default function Admin() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-all text-xs font-display flex items-center justify-center space-x-1.5"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-semibold py-2.5 rounded-xl transition-all text-xs font-display flex items-center justify-center space-x-1.5"
                 >
                   <Save className="w-4 h-4" />
                   <span>{editingSportId ? 'Guardar Cambios' : 'Publicar Actividad'}</span>
@@ -1500,7 +1676,7 @@ export default function Admin() {
                       setSportPlace('')
                       setSportLimitSlots(10)
                     }}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 py-2.5 px-4 rounded-xl transition-all text-xs font-semibold"
+                    className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-700/50 py-2.5 px-4 rounded-xl transition-all text-xs font-semibold"
                   >
                     Cancelar
                   </button>
@@ -1511,9 +1687,9 @@ export default function Admin() {
 
           {/* Listado de Actividades Deportivas */}
           <div className="lg:col-span-2 space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 px-1">Actividades Programadas</h3>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">Actividades Programadas</h3>
             {sports.length === 0 ? (
-              <div className="glass rounded-3xl p-8 text-center border border-slate-850">
+              <div className="glass rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-850">
                 <p className="text-slate-500 text-xs italic">No hay actividades registradas en la base de datos.</p>
               </div>
             ) : (
@@ -1521,12 +1697,12 @@ export default function Admin() {
                 {sports.map((sport) => {
                   const regCount = sport.sports_registrations?.length || 0
                   return (
-                    <div key={sport.id} className="glass rounded-3xl p-6 border border-slate-850 space-y-4">
-                      <div className="flex justify-between items-start border-b border-slate-850/60 pb-3">
+                    <div key={sport.id} className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-4">
+                      <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-850/60 pb-3">
                         <div>
                           <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block">{sport.sport_type}</span>
-                          <h4 className="font-bold text-sm text-slate-200 mt-0.5">{sport.title}</h4>
-                          <p className="text-[10px] text-slate-400 mt-1">Lugar: {sport.place} | Cupos: {regCount} / {sport.limit_slots}</p>
+                          <h4 className="font-bold text-sm text-slate-700 dark:text-slate-200 mt-0.5">{sport.title}</h4>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Lugar: {sport.place} | Cupos: {regCount} / {sport.limit_slots}</p>
                         </div>
                         <div className="flex items-center space-x-2 shrink-0">
                           <button
@@ -1556,7 +1732,7 @@ export default function Admin() {
                             {sport.sports_registrations.map((reg) => (
                               <span 
                                 key={reg.id} 
-                                className="bg-slate-900 border border-slate-800 text-[10px] text-slate-300 px-2.5 py-1 rounded-lg font-medium"
+                                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-lg font-medium"
                               >
                                 {reg.profiles?.nombre || 'Miembro'}
                               </span>
@@ -1577,47 +1753,47 @@ export default function Admin() {
       {activeTab === 'recursos' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Formulario de Recurso */}
-          <div className="glass rounded-3xl p-6 border border-slate-850 h-fit space-y-6">
+          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 h-fit space-y-6">
             <div>
-              <h3 className="text-lg font-bold font-display text-white">
+              <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white">
                 {editingRecursoId ? 'Editar Recurso' : 'Nuevo Recurso'}
               </h3>
-              <p className="text-slate-400 text-xs mt-1">
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
                 Agrega manuales, guías o el kit replicable a la biblioteca digital.
               </p>
             </div>
 
             <form onSubmit={handleSaveRecurso} className="space-y-4">
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Título del Recurso</label>
+                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Título del Recurso</label>
                 <input
                   type="text"
                   required
                   value={recursoTitle}
                   onChange={(e) => setRecursoTitle(e.target.value)}
                   placeholder="Ej: Manual del Discipulador"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Descripción Corta</label>
+                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Descripción Corta</label>
                 <textarea
                   required
                   rows="3"
                   value={recursoDesc}
                   onChange={(e) => setRecursoDesc(e.target.value)}
                   placeholder="Breve descripción del contenido del archivo..."
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs leading-relaxed"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs leading-relaxed"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1.5">Categoría</label>
+                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Categoría</label>
                 <select
                   value={recursoCategory}
                   onChange={(e) => setRecursoCategory(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
                 >
                   <option value="Manuales">Manuales</option>
                   <option value="Escuela">Escuela de Líderes</option>
@@ -1626,14 +1802,14 @@ export default function Admin() {
               </div>
 
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1.5">URL de Descarga del Archivo</label>
+                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">URL de Descarga del Archivo</label>
                 <input
                   type="url"
                   required
                   value={recursoFileUrl}
                   onChange={(e) => setRecursoFileUrl(e.target.value)}
                   placeholder="https://ejemplo.com/recurso.pdf"
-                  className="w-full bg-slate-900 border border-slate-805 rounded-xl p-3 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-805 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
                 />
               </div>
 
@@ -1641,7 +1817,7 @@ export default function Admin() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-all text-xs font-display flex items-center justify-center space-x-1.5"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-semibold py-2.5 rounded-xl transition-all text-xs font-display flex items-center justify-center space-x-1.5"
                 >
                   <Save className="w-4 h-4" />
                   <span>{editingRecursoId ? 'Guardar Cambios' : 'Publicar Recurso'}</span>
@@ -1656,7 +1832,7 @@ export default function Admin() {
                       setRecursoCategory('Manuales')
                       setRecursoFileUrl('')
                     }}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 py-2.5 px-4 rounded-xl transition-all text-xs font-semibold"
+                    className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-700/50 py-2.5 px-4 rounded-xl transition-all text-xs font-semibold"
                   >
                     Cancelar
                   </button>
@@ -1667,23 +1843,23 @@ export default function Admin() {
 
           {/* Listado de Recursos */}
           <div className="lg:col-span-2 space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 px-1">Biblioteca de Recursos</h3>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">Biblioteca de Recursos</h3>
             {resources.length === 0 ? (
-              <div className="glass rounded-3xl p-8 text-center border border-slate-850">
+              <div className="glass rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-850">
                 <p className="text-slate-500 text-xs italic">No hay recursos publicados en la base de datos.</p>
               </div>
             ) : (
               <div className="space-y-4">
                 {resources.map((res) => (
-                  <div key={res.id} className="glass rounded-3xl p-5 border border-slate-850 flex items-start justify-between gap-4">
+                  <div key={res.id} className="glass rounded-3xl p-5 border border-slate-200 dark:border-slate-850 flex items-start justify-between gap-4">
                     <div className="space-y-1.5">
                       <div className="flex items-center space-x-2">
                         <span className="bg-indigo-950/20 border border-indigo-900/10 text-indigo-400 font-bold px-2 py-0.5 rounded-lg text-[9px] uppercase">
                           {res.category === 'Escuela' ? 'Escuela de Líderes' : res.category}
                         </span>
-                        <h4 className="font-bold text-xs text-slate-200">{res.title}</h4>
+                        <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">{res.title}</h4>
                       </div>
-                      <p className="text-slate-400 text-[10.5px] leading-relaxed">{res.description}</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-[10.5px] leading-relaxed">{res.description}</p>
                       <div className="flex items-center space-x-3 text-[10px] text-slate-500">
                         <span>Descargas: {res.downloads_count}</span>
                         <span>•</span>
@@ -1725,11 +1901,11 @@ export default function Admin() {
 
       {/* TAB 6: GESTIÓN DE USUARIOS */}
       {activeTab === 'usuarios' && (
-        <div className="glass rounded-3xl p-6 border border-slate-850 space-y-6">
+        <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-bold font-display text-white">Gestión de Usuarios</h3>
-              <p className="text-slate-400 text-xs mt-1">
+              <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white">Gestión de Usuarios</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
                 Asigna roles y privilegios a los miembros registrados en la aplicación.
               </p>
             </div>
@@ -1742,14 +1918,14 @@ export default function Admin() {
                 value={userSearchTerm}
                 onChange={(e) => setUserSearchTerm(e.target.value)}
                 placeholder="Buscar por nombre o correo..."
-                className="w-full bg-slate-950 border border-slate-850 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-200 placeholder-slate-650 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-700 dark:text-slate-200 placeholder-slate-650 focus:outline-none focus:border-indigo-500"
               />
             </div>
           </div>
 
-          <div className="bg-slate-900/40 rounded-2xl border border-slate-850/80 overflow-hidden overflow-x-auto">
+          <div className="bg-slate-50/80 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-850/80 overflow-hidden overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-350">
-              <thead className="bg-slate-950/80 border-b border-slate-850/60 font-semibold text-slate-400">
+              <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-850/60 font-semibold text-slate-500 dark:text-slate-400">
                 <tr>
                   <th className="p-4">Nombre</th>
                   <th className="p-4">Email</th>
@@ -1772,11 +1948,11 @@ export default function Admin() {
                     p.nombre.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
                     p.email.toLowerCase().includes(userSearchTerm.toLowerCase())
                   ).map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-900/30 transition-colors">
-                      <td className="p-4 font-bold text-slate-200">{p.nombre}</td>
-                      <td className="p-4 font-mono text-slate-400">{p.email}</td>
+                    <tr key={p.id} className="hover:bg-white dark:bg-slate-900/30 transition-colors">
+                      <td className="p-4 font-bold text-slate-700 dark:text-slate-200">{p.nombre}</td>
+                      <td className="p-4 font-mono text-slate-500 dark:text-slate-400">{p.email}</td>
                       <td className="p-4">
-                        <p className="text-[10px] text-slate-400 leading-tight">Célula: {p.celulas?.nombre || 'Ninguna'}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Célula: {p.celulas?.nombre || 'Ninguna'}</p>
                         <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Ministerio: {p.ministerios?.nombre || 'Ninguno'}</p>
                       </td>
                       <td className="p-4 text-right">
@@ -1784,7 +1960,7 @@ export default function Admin() {
                           value={p.rol}
                           onChange={(e) => handleUpdateUserRole(p.id, e.target.value)}
                           disabled={p.id === user.id} // Evitar auto-bloqueo
-                          className={`bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
+                          className={`bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
                             p.rol === 'pastor_admin' 
                               ? 'text-rose-400 border-rose-500/20' 
                               : p.rol === 'lider' 
@@ -1811,10 +1987,10 @@ export default function Admin() {
 
       {/* TAB 7: CONFIGURACIONES */}
       {activeTab === 'configuracion' && (
-        <div className="glass rounded-3xl p-6 border border-slate-850 space-y-6">
+        <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-6">
           <div>
-            <h3 className="text-lg font-bold font-display text-white">Configuración de Visibilidad de Módulos</h3>
-            <p className="text-slate-400 text-xs mt-1">
+            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white">Configuración de Visibilidad de Módulos</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
               Decide qué módulos se pueden navegar públicamente (sin iniciar sesión) y cuáles requieren obligatoriamente de un inicio de sesión.
             </p>
           </div>
@@ -1830,9 +2006,9 @@ export default function Admin() {
             ].map((mod) => {
               const isPublic = moduleVisibility && moduleVisibility[mod.key] === true
               return (
-                <div key={mod.key} className="p-5 bg-slate-900/40 rounded-2xl border border-slate-850 flex items-center justify-between gap-6 hover:border-slate-800 transition-all">
+                <div key={mod.key} className="p-5 bg-slate-50/80 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-850 flex items-center justify-between gap-6 hover:border-slate-200 dark:border-slate-800 transition-all">
                   <div className="space-y-1">
-                    <h4 className="font-bold text-xs text-slate-200">{mod.label}</h4>
+                    <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">{mod.label}</h4>
                     <p className="text-slate-500 text-[10px] leading-relaxed max-w-sm">{mod.desc}</p>
                   </div>
                   
@@ -1841,7 +2017,7 @@ export default function Admin() {
                     onClick={() => handleToggleVisibility(mod.key, isPublic)}
                     disabled={loading}
                     className={`w-14 h-7 rounded-full p-1 transition-all duration-300 flex items-center shrink-0 ${
-                      isPublic ? 'bg-indigo-600 justify-end' : 'bg-slate-800 justify-start'
+                      isPublic ? 'bg-indigo-600 justify-end' : 'bg-slate-100 dark:bg-slate-800 justify-start'
                     }`}
                   >
                     <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all"></div>

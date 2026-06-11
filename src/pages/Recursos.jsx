@@ -90,7 +90,7 @@ export default function Recursos() {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <Loader className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-        <p className="text-slate-400 text-sm">Cargando biblioteca digital...</p>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">Cargando biblioteca digital...</p>
       </div>
     )
   }
@@ -102,11 +102,11 @@ export default function Recursos() {
     <div className="space-y-8 animate-fade-in">
       {/* Cabecera */}
       <div>
-        <h2 className="text-3xl font-bold font-display text-white tracking-tight flex items-center space-x-2">
+        <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight flex items-center space-x-2">
           <FileText className="w-8 h-8 text-indigo-500" />
           <span>Biblioteca Digital y Recursos</span>
         </h2>
-        <p className="text-slate-400 text-sm mt-1">
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
           Accede a manuales doctrinales, material académico de la Escuela de Líderes y recursos para la replicación del sistema.
         </p>
       </div>
@@ -127,10 +127,10 @@ export default function Recursos() {
             <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-block">
               Proyecto Abierto (Open Source)
             </span>
-            <h3 className="text-xl sm:text-2xl font-bold font-display text-white leading-tight">
+            <h3 className="text-xl sm:text-2xl font-bold font-display text-slate-900 dark:text-white leading-tight">
               Kit Replicable de Vida Nueva App
             </h3>
-            <p className="text-slate-300 text-xs leading-relaxed max-w-2xl text-justify">
+            <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed max-w-2xl text-justify">
               ¿Quieres implementar este sistema en tu congregación? El **Kit Replicable** contiene los manuales técnicos, plantillas de base de datos y guías de configuración para desplegar Vida Nueva App en React, Supabase y Vercel de manera totalmente autónoma.
             </p>
           </div>
@@ -138,13 +138,13 @@ export default function Recursos() {
             {replicationKit ? (
               <button
                 onClick={() => handleDownload(replicationKit)}
-                className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3.5 px-6 rounded-xl transition-all active:scale-[0.98] text-xs font-display shadow-lg shadow-indigo-950/50"
+                className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-semibold py-3.5 px-6 rounded-xl transition-all active:scale-[0.98] text-xs font-display shadow-lg shadow-indigo-950/50"
               >
                 <Download className="w-4 h-4" />
                 <span>Descargar Setup Guide</span>
               </button>
             ) : (
-              <div className="text-slate-500 text-center text-xs border border-dashed border-slate-800 p-4 rounded-xl">
+              <div className="text-slate-500 text-center text-xs border border-dashed border-slate-200 dark:border-slate-800 p-4 rounded-xl">
                 Manual del Kit temporalmente fuera de línea.
               </div>
             )}
@@ -152,7 +152,7 @@ export default function Recursos() {
               href="https://github.com/patriciomelor/ibvn-app"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center space-x-2 bg-slate-900 hover:bg-slate-800 text-indigo-400 border border-slate-800 py-3.5 px-6 rounded-xl transition-all text-xs font-semibold font-display"
+              className="flex items-center justify-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:bg-slate-800 text-indigo-400 border border-slate-200 dark:border-slate-800 py-3.5 px-6 rounded-xl transition-all text-xs font-semibold font-display"
             >
               <Cpu className="w-4 h-4" />
               <span>Ver Código en GitHub</span>
@@ -163,7 +163,7 @@ export default function Recursos() {
       </div>
 
       {/* Controles de Filtro y Buscador */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/40 p-4 rounded-2xl border border-slate-850">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/80 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-850">
         {/* Tabs de Categoría */}
         <div className="flex gap-1.5 overflow-x-auto pb-1 md:pb-0">
           {categories.map((cat) => (
@@ -172,8 +172,8 @@ export default function Recursos() {
               onClick={() => setSelectedCategory(cat)}
               className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
                 selectedCategory === cat
-                  ? 'bg-indigo-600 text-white font-bold'
-                  : 'bg-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                  ? 'bg-indigo-600 text-slate-900 dark:text-white font-bold'
+                  : 'bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:bg-slate-800/40'
               }`}
             >
               {cat === 'Escuela' ? 'Escuela de Líderes' : cat}
@@ -189,14 +189,14 @@ export default function Recursos() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar recursos por título..."
-            className="w-full bg-slate-950 border border-slate-850 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-700 dark:text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
         </div>
       </div>
 
       {/* Grid de Recursos */}
       {filteredResources.length === 0 ? (
-        <div className="text-center py-12 bg-slate-900/10 rounded-2xl border border-dashed border-slate-850">
+        <div className="text-center py-12 bg-white dark:bg-slate-900/10 rounded-2xl border border-dashed border-slate-200 dark:border-slate-850">
           <HelpCircle className="w-12 h-12 text-slate-700 mx-auto mb-3" />
           <p className="text-slate-500 text-xs italic">No se encontraron recursos que coincidan con la búsqueda.</p>
         </div>
@@ -213,14 +213,14 @@ export default function Recursos() {
                 case 'Kit Replicable':
                   return <Cpu className="w-5 h-5 text-indigo-400" />
                 default:
-                  return <FileText className="w-5 h-5 text-slate-400" />
+                  return <FileText className="w-5 h-5 text-slate-500 dark:text-slate-400" />
               }
             }
 
             return (
               <div 
                 key={res.id} 
-                className="glass rounded-2xl p-5 border border-slate-850 flex flex-col justify-between min-h-[200px] hover:border-slate-800 transition-all hover:translate-y-[-2px] duration-300"
+                className="glass rounded-2xl p-5 border border-slate-200 dark:border-slate-850 flex flex-col justify-between min-h-[200px] hover:border-slate-200 dark:border-slate-800 transition-all hover:translate-y-[-2px] duration-300"
               >
                 <div className="space-y-3">
                   {/* Etiqueta y descargas */}
@@ -235,12 +235,12 @@ export default function Recursos() {
                   </div>
 
                   {/* Título */}
-                  <h4 className="font-bold text-sm text-slate-200 font-display leading-tight">
+                  <h4 className="font-bold text-sm text-slate-700 dark:text-slate-200 font-display leading-tight">
                     {res.title}
                   </h4>
 
                   {/* Descripción */}
-                  <p className="text-slate-400 text-[11px] leading-relaxed text-justify">
+                  <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed text-justify">
                     {res.description}
                   </p>
                 </div>
@@ -248,7 +248,7 @@ export default function Recursos() {
                 {/* Botón Descarga */}
                 <button
                   onClick={() => handleDownload(res)}
-                  className="w-full flex items-center justify-center space-x-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-indigo-400 py-2.5 rounded-xl text-xs font-semibold mt-4 transition-all active:scale-[0.98]"
+                  className="w-full flex items-center justify-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 text-indigo-400 py-2.5 rounded-xl text-xs font-semibold mt-4 transition-all active:scale-[0.98]"
                 >
                   <Download className="w-4 h-4" />
                   <span>Descargar Recurso</span>

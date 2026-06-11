@@ -52,13 +52,13 @@ export default function OnboardingModal() {
   const CurrentIcon = steps[step].icon
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in print:hidden">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 relative shadow-2xl flex flex-col items-center text-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950/80 backdrop-blur-md animate-fade-in print:hidden">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 relative shadow-2xl flex flex-col items-center text-center">
         
         {/* Botón Cerrar */}
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 p-1.5 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+          className="absolute top-4 right-4 p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -71,8 +71,8 @@ export default function OnboardingModal() {
         {/* Título y Descripción */}
         <div className="space-y-2.5 mb-8">
           <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Paso {step + 1} de 3</span>
-          <h3 className="text-xl font-bold font-display text-white">{steps[step].title}</h3>
-          <p className="text-slate-400 text-xs leading-relaxed max-w-sm">
+          <h3 className="text-xl font-bold font-display text-slate-900 dark:text-white">{steps[step].title}</h3>
+          <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed max-w-sm">
             {steps[step].desc}
           </p>
         </div>
@@ -83,7 +83,7 @@ export default function OnboardingModal() {
             <div
               key={idx}
               className={`h-1.5 rounded-full transition-all duration-300 ${
-                idx === step ? 'w-6 bg-indigo-500' : 'w-1.5 bg-slate-800'
+                idx === step ? 'w-6 bg-indigo-500' : 'w-1.5 bg-slate-100 dark:bg-slate-800'
               }`}
             />
           ))}
@@ -92,7 +92,7 @@ export default function OnboardingModal() {
         {/* Botón Acción */}
         <button
           onClick={handleNext}
-          className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-xl transition-all active:scale-[0.98] text-xs font-display shadow-lg shadow-indigo-950/50"
+          className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-3 rounded-xl transition-all active:scale-[0.98] text-xs font-display shadow-lg shadow-indigo-950/50"
         >
           <span>{step < 2 ? 'Siguiente' : 'Comenzar'}</span>
           <ChevronRight className="w-4 h-4" />
