@@ -41,7 +41,7 @@ export default function Profile() {
       // 2. Cargar datos del perfil
       let { data: profData, error: profErr } = await supabase
         .from('profiles')
-        .select('*, celulas(nombre), ministerios(nombre)')
+        .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
         .eq('id', user.id)
         .single()
 
@@ -57,7 +57,7 @@ export default function Profile() {
                 nombre: user.user_metadata?.nombre || user.user_metadata?.name || 'Miembro Nuevo',
                 rol: 'miembro'
               })
-              .select('*, celulas(nombre), ministerios(nombre)')
+              .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
               .single()
             
             if (!insertErr) {

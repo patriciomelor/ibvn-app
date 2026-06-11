@@ -304,7 +304,7 @@ export default function Admin() {
       // 1. Obtener perfiles de usuarios
       const { data: profs, error: profsErr } = await supabase
         .from('profiles')
-        .select('*, celulas(nombre), ministerios(nombre)')
+        .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
         .order('nombre')
       if (profsErr) throw profsErr
       setProfiles(profs || [])

@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }) => {
       // 2. Consultar el perfil
       let { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
         .eq('id', userId)
         .single()
       
@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }) => {
                   nombre: authUser.user_metadata?.nombre || authUser.user_metadata?.name || 'Miembro Nuevo',
                   rol: 'miembro'
                 })
-                .select()
+                .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
                 .single()
               
               if (!insertError && fallbackProfile) {
@@ -179,7 +179,7 @@ export const AuthProvider = ({ children }) => {
       .from('profiles')
       .update(updates)
       .eq('id', user.id)
-      .select()
+      .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
       .single()
     
     if (error) throw error

@@ -20,7 +20,7 @@ export default function EscuelaLideres() {
       // 1. Cargar perfil del miembro e información de su mentor
       const { data: prof, error: profErr } = await supabase
         .from('profiles')
-        .select('*, celulas(nombre), ministerios(nombre)')
+        .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
         .eq('id', user.id)
         .single()
       
