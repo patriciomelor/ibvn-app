@@ -102,6 +102,74 @@ export default function Admin() {
     mayordomo_name: '',
     calendar_url: ''
   })
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+
+  const handleLogoUpload = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setUploadingLogo(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `logo-${Math.random()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = async () => {
+          const canvas = document.createElement('canvas')
+          const size = Math.min(img.width, img.height)
+          canvas.width = 512
+          canvas.height = 512
+          const ctx = canvas.getContext('2d')
+
+          const sx = (img.width - size) / 2
+          const sy = (img.height - size) / 2
+          ctx.drawImage(img, sx, sy, size, size, 0, 0, 512, 512)
+
+          canvas.toBlob(async (blob) => {
+            if (!blob) {
+              setUploadingLogo(false)
+              setErrorMessage('Error al procesar la imagen.')
+              return
+            }
+
+            try {
+              const { error: uploadError } = await supabase.storage
+                .from('settings')
+                .upload(filePath, blob, {
+                  contentType: 'image/jpeg'
+                })
+
+              if (uploadError) throw uploadError
+
+              const { data: { publicUrl } } = supabase.storage
+                .from('settings')
+                .getPublicUrl(filePath)
+
+              setSettingsForm(prev => ({ ...prev, logo_url: publicUrl }))
+              setSuccessMessage('Logo cargado y recortado correctamente. Recuerda guardar los cambios.')
+            } catch (uploadErr) {
+              console.error('Error uploading logo:', uploadErr.message)
+              setErrorMessage('Error al subir el logotipo a Supabase Storage.')
+            } finally {
+              setUploadingLogo(false)
+            }
+          }, 'image/jpeg', 0.9)
+        }
+        img.src = e.target.result
+      }
+      reader.readAsDataURL(file)
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al procesar el archivo.')
+      setUploadingLogo(false)
+    }
+  }
 
   useEffect(() => {
     if (churchSettings) {
@@ -402,10 +470,24 @@ export default function Admin() {
     setErrorMessage('')
     setSuccessMessage('')
     try {
+      const labelMap = {
+        devocional: 'Devocional Diario',
+        archive: 'Historial de Devocionales',
+        misiones: 'Misiones',
+        escuela: 'Escuela de Líderes',
+        deportes: 'Deportes y Recreación',
+        recursos: 'Biblioteca de Recursos',
+        calendario: 'Calendario Oficial'
+      }
+
       const { error } = await supabase
         .from('module_visibility')
-        .update({ is_public: !currentStatus })
-        .eq('module_key', moduleKey)
+        .upsert({ 
+          module_key: moduleKey, 
+          label: labelMap[moduleKey] || moduleKey,
+          is_public: !currentStatus 
+        }, { onConflict: 'module_key' })
+
       if (error) throw error
       setSuccessMessage(`¡Visibilidad del módulo actualizada con éxito!`)
       await refreshVisibility()
@@ -746,6 +828,7 @@ export default function Admin() {
         .from('profiles')
         .update({
           rol: selectedUser.rol,
+          cargo: selectedUser.cargo || 'Miembro',
           celula_id: selectedUser.celula_id || null,
           ministerio_id: selectedUser.ministerio_id || null,
           mentor_id: selectedUser.mentor_id || null,
@@ -924,6 +1007,7 @@ export default function Admin() {
       'Telefono',
       'Direccion',
       'Rol',
+      'Cargo',
       'Celula',
       'Ministerio',
       'Fecha Registro'
@@ -935,6 +1019,7 @@ export default function Admin() {
       p.tel || '',
       p.direccion || '',
       p.rol,
+      p.cargo || 'Miembro',
       p.celulas?.nombre || 'Ninguna',
       p.ministerios?.nombre || 'Ninguno',
       new Date(p.created_at).toLocaleDateString('es-CL')
@@ -1353,7 +1438,7 @@ export default function Admin() {
                     >
                       <div>
                         <p className="font-semibold text-slate-700 dark:text-slate-200 text-xs">{member.nombre}</p>
-                        <span className="text-[10px] text-slate-500 capitalize">{member.rol}</span>
+                        <span className="text-[10px] text-slate-500 capitalize">{member.rol} • {member.cargo || 'Miembro'}</span>
                       </div>
                       <ChevronRight className="w-4 h-4 text-slate-600" />
                     </button>
@@ -1541,8 +1626,8 @@ export default function Admin() {
                 {crmTab === 'discipulado' && (
                   <form onSubmit={handleUpdateMemberConfig} className="space-y-6 animate-fade-in">
                     
-                    {/* Asignación de Rol y Mentor */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    {/* Asignación de Rol, Cargo y Mentor */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                       <div>
                         <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Rol del Miembro</label>
                         <select
@@ -1553,6 +1638,22 @@ export default function Admin() {
                           <option value="miembro">Miembro / Asistente</option>
                           <option value="lider">Líder de Ministerio / Célula</option>
                           <option value="pastor_admin">Pastor / Administrador</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Cargo Eclesiástico</label>
+                        <select
+                          value={selectedUser.cargo || 'Miembro'}
+                          onChange={(e) => setSelectedUser({ ...selectedUser, cargo: e.target.value })}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
+                        >
+                          <option value="Miembro">Miembro</option>
+                          <option value="Colaborador">Colaborador</option>
+                          <option value="Líder de Célula">Líder de Célula</option>
+                          <option value="Coordinador de Ministerio">Coordinador de Ministerio</option>
+                          <option value="Diácono">Diácono</option>
+                          <option value="Pastor">Pastor</option>
                         </select>
                       </div>
 
@@ -2429,6 +2530,7 @@ export default function Admin() {
               { key: 'escuela', label: 'Escuela de Líderes', desc: 'Permite visualizar los temas y lecciones de la Escuela. El avance personal seguirá requiriendo login.' },
               { key: 'deportes', label: 'Deportes y Recreación', desc: 'Permite ver los próximos partidos y salidas. Inscribirse y ver participantes requerirá login.' },
               { key: 'recursos', label: 'Biblioteca de Recursos', desc: 'Permite descargar manuales de apoyo doctrinal y el Kit Replicable a cualquier visitante.' },
+              { key: 'calendario', label: 'Calendario Oficial', desc: 'Permite visualizar el calendario de actividades a invitados sin iniciar sesión.' },
             ].map((mod) => {
               const isPublic = moduleVisibility && moduleVisibility[mod.key] === true
               return (
@@ -2464,45 +2566,90 @@ export default function Admin() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Nombre de la Iglesia</label>
-                  <input type="text" value={settingsForm.name} onChange={e => setSettingsForm({...settingsForm, name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" required />
+                  <input type="text" value={settingsForm.name || ''} onChange={e => setSettingsForm({...settingsForm, name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" required />
                 </div>
-                <div>
-                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL del Logo</label>
-                  <input type="url" value={settingsForm.logo_url} onChange={e => setSettingsForm({...settingsForm, logo_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://..." />
+                <div className="md:col-span-2 flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-500/5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 mb-2">
+                  <div className="relative w-20 h-20 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                    {settingsForm.logo_url ? (
+                      <img src={settingsForm.logo_url} alt="Logo" className="w-full h-full object-cover" />
+                    ) : (
+                      <UploadCloud className="w-8 h-8 text-slate-400" />
+                    )}
+                    {uploadingLogo && (
+                      <div className="absolute inset-0 bg-slate-950/60 flex items-center justify-center">
+                        <Loader className="w-5 h-5 text-indigo-400 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1.5 text-center sm:text-left">
+                    <h5 className="text-xs font-bold text-slate-700 dark:text-slate-200">Logotipo de la Iglesia</h5>
+                    <p className="text-[10px] text-slate-400">Sube una imagen. Se recortará automáticamente a formato cuadrado (512x512px) de alta calidad.</p>
+                    <div className="flex flex-wrap justify-center sm:justify-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById('logo-file-input').click()}
+                        disabled={uploadingLogo}
+                        className="bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600/20 border border-indigo-500/20 text-[10px] font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Seleccionar Imagen
+                      </button>
+                      <input
+                        id="logo-file-input"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleLogoUpload}
+                        disabled={uploadingLogo}
+                      />
+                      {settingsForm.logo_url && (
+                        <button
+                          type="button"
+                          onClick={() => setSettingsForm({ ...settingsForm, logo_url: '' })}
+                          className="bg-rose-600/10 text-rose-600 dark:text-rose-400 hover:bg-rose-600/20 border border-rose-500/20 text-[10px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          Eliminar Logo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL del Logo (Opcional - obtenido al subir imagen)</label>
+                  <input type="url" value={settingsForm.logo_url || ''} onChange={e => setSettingsForm({...settingsForm, logo_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://..." />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Dirección Principal</label>
-                  <input type="text" value={settingsForm.address} onChange={e => setSettingsForm({...settingsForm, address: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="text" value={settingsForm.address || ''} onChange={e => setSettingsForm({...settingsForm, address: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL Calendario Público (Ej. Google Calendar HTML)</label>
-                  <input type="url" value={settingsForm.calendar_url} onChange={e => setSettingsForm({...settingsForm, calendar_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://calendar.google.com/calendar/embed?src=..." />
+                  <input type="url" value={settingsForm.calendar_url || ''} onChange={e => setSettingsForm({...settingsForm, calendar_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://calendar.google.com/calendar/embed?src=..." />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Teléfono Público</label>
-                  <input type="text" value={settingsForm.phone} onChange={e => setSettingsForm({...settingsForm, phone: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="text" value={settingsForm.phone || ''} onChange={e => setSettingsForm({...settingsForm, phone: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Email Público</label>
-                  <input type="email" value={settingsForm.email} onChange={e => setSettingsForm({...settingsForm, email: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="email" value={settingsForm.email || ''} onChange={e => setSettingsForm({...settingsForm, email: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Nombre Mayordomo / Pastor General</label>
-                  <input type="text" value={settingsForm.mayordomo_name} onChange={e => setSettingsForm({...settingsForm, mayordomo_name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="text" value={settingsForm.mayordomo_name || ''} onChange={e => setSettingsForm({...settingsForm, mayordomo_name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 dark:border-slate-800 pt-4">
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Facebook URL</label>
-                  <input type="url" value={settingsForm.social_facebook} onChange={e => setSettingsForm({...settingsForm, social_facebook: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="url" value={settingsForm.social_facebook || ''} onChange={e => setSettingsForm({...settingsForm, social_facebook: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Instagram URL</label>
-                  <input type="url" value={settingsForm.social_instagram} onChange={e => setSettingsForm({...settingsForm, social_instagram: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="url" value={settingsForm.social_instagram || ''} onChange={e => setSettingsForm({...settingsForm, social_instagram: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">YouTube URL</label>
-                  <input type="url" value={settingsForm.social_youtube} onChange={e => setSettingsForm({...settingsForm, social_youtube: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="url" value={settingsForm.social_youtube || ''} onChange={e => setSettingsForm({...settingsForm, social_youtube: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
               </div>
               <div className="flex justify-end pt-4">

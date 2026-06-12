@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, History, User, ShieldCheck, LogOut, LogIn, Globe, Award, Activity, FileText, Download, Calendar as CalendarIcon } from 'lucide-react'
+import { BookOpen, History, User, ShieldCheck, LogOut, LogIn, Globe, Award, Activity, FileText, Download, Calendar as CalendarIcon, ArrowLeft } from 'lucide-react'
 import OnboardingModal from './OnboardingModal'
 
 export default function Layout({ children }) {
@@ -35,11 +35,8 @@ export default function Layout({ children }) {
     { path: '/escuela', label: 'Escuela', icon: Award },
     { path: '/deportes', label: 'Deportes', icon: Activity },
     { path: '/recursos', label: 'Recursos', icon: FileText },
+    { path: '/calendario', label: 'Calendario', icon: CalendarIcon },
   ]
-
-  if (churchSettings?.calendar_url) {
-    navItems.push({ path: '/calendario', label: 'Calendario', icon: CalendarIcon }) // We need to import Calendar from lucide-react, aliased or renamed
-  }
 
   // Filtrar ítems de navegación según estado de autenticación y configuraciones de visibilidad
   const visibleNavItems = navItems.filter(item => {
@@ -103,7 +100,7 @@ export default function Layout({ children }) {
           <div className="overflow-hidden">
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{profile?.nombre || 'Invitado'}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">
-              {profile ? (profile.rol === 'pastor_admin' ? 'Pastor / Admin' : profile.rol) : 'Navegación Pública'}
+              {profile ? (profile.cargo || (profile.rol === 'pastor_admin' ? 'Pastor / Admin' : profile.rol)) : 'Navegación Pública'}
             </p>
           </div>
         </div>
@@ -163,6 +160,11 @@ export default function Layout({ children }) {
       {/* 2. HEADER PARA MÓVIL */}
       <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40">
         <div className="flex items-center space-x-2 truncate">
+          {location.pathname !== '/' && (
+            <button onClick={() => navigate(-1)} className="mr-1 p-1 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white rounded-lg transition-colors" title="Volver">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
           <img src={churchSettings?.logo_url || "/favicon.png"} alt="Logo" className="w-8 h-8 rounded-lg shadow-sm border border-indigo-500/20 object-cover shrink-0" />
           <h1 className="text-sm font-bold font-display tracking-tight text-slate-900 dark:text-white truncate">{churchSettings?.name || 'Vida Nueva'}</h1>
         </div>
@@ -220,14 +222,14 @@ export default function Layout({ children }) {
       </header>
 
       {/* 3. CONTENIDO PRINCIPAL */}
-      <main className="flex-1 flex flex-col min-w-0 pb-20 md:pb-6 overflow-y-auto">
+      <main className="flex-1 flex flex-col min-w-0 pb-28 md:pb-6 overflow-y-auto">
         <div className="max-w-4xl w-full mx-auto p-4 md:p-8 animate-fade-in">
           {children}
         </div>
       </main>
 
       {/* 4. BOTTOM BAR (Navegación Móvil) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 px-2 py-2 flex overflow-x-auto hide-scrollbar shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 px-2 py-2 rounded-2xl flex overflow-x-auto hide-scrollbar shadow-lg shadow-slate-950/10">
         <div className="flex w-max min-w-full justify-around space-x-1">
           {visibleNavItems.filter(item => !['/profile', '/admin', '/login'].includes(item.path)).map((item) => {
             const Icon = item.icon
