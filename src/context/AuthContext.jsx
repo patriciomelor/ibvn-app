@@ -106,12 +106,85 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  useEffect(() => {
-    fetchVisibility()
-    fetchSettings()
+  const updateDynamicManifestAndMetadata = (settings) => {
+    if (!settings) return
+
+    // 1. Title & Meta description
+    document.title = `${settings.name || 'Vida Nueva'} App`
     
-    supabase.auth.getSession()
-      .then(async ({ data: { session } }) => {
+    const metaDesc = document.querySelector('meta[name="description"]')
+    if (metaDesc) {
+      metaDesc.setAttribute('content', `Aplicación oficial de ${settings.name || 'Vida Nueva'}.`)
+    }
+
+    // 2. Favicon & Apple Icon
+    const iconUrl = settings.logo_url || '/favicon.png'
+    const favicon = document.querySelector('link[rel="icon"]')
+    if (favicon) favicon.setAttribute('href', iconUrl)
+    
+    const appleIcon = document.querySelector('link[rel="apple-touch-icon"]')
+    if (appleIcon) appleIcon.setAttribute('href', iconUrl)
+
+    // 3. Dynamic PWA Manifest
+    let manifestLink = document.querySelector('link[rel="manifest"]')
+    if (!manifestLink) {
+      manifestLink = document.createElement('link')
+      manifestLink.setAttribute('rel', 'manifest')
+      document.head.appendChild(manifestLink)
+    }
+
+    const dynamicManifest = {
+      name: `${settings.name || 'Vida Nueva'} App`,
+      short_name: settings.name || 'Vida Nueva',
+      description: `Aplicación ministerial oficial de ${settings.name || 'Vida Nueva'}.`,
+      theme_color: '#1e293b',
+      background_color: '#0f172a',
+      display: 'standalone',
+      orientation: 'portrait',
+      scope: '/',
+      start_url: '/',
+      icons: [
+        {
+          src: iconUrl,
+          sizes: '192x192',
+          type: 'image/png'
+        },
+        {
+          src: iconUrl,
+          sizes: '512x512',
+          type: 'image/png'
+        },
+        {
+          src: iconUrl,
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'any maskable'
+        }
+      ]
+    }
+    
+    const stringManifest = JSON.stringify(dynamicManifest)
+    const blob = new Blob([stringManifest], { type: 'application/json' })
+    const manifestURL = URL.createObjectURL(blob)
+    manifestLink.setAttribute('href', manifestURL)
+  }
+
+  useEffect(() => {
+    if (churchSettings) {
+      updateDynamicManifestAndMetadata(churchSettings)
+    }
+  }, [churchSettings])
+
+  useEffect(() => {
+    let activeSubscription = null
+
+    const initApp = async () => {
+      try {
+        await Promise.all([
+          fetchVisibility(),
+          fetchSettings()
+        ])
+        const { data: { session } } = await supabase.auth.getSession()
         if (session) {
           setUser(session.user)
           await fetchProfile(session.user.id)
@@ -119,31 +192,37 @@ export const AuthProvider = ({ children }) => {
           setUser(null)
           setProfile(null)
         }
-      })
-      .catch((err) => {
+
+        // Registrar el listener de cambio de sesión solo después de que se carguen los ajustes
+        const { data } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') {
+              setLoading(true)
+              if (session) {
+                setUser(session.user)
+                await fetchProfile(session.user.id)
+              } else {
+                setUser(null)
+                setProfile(null)
+              }
+              setLoading(false)
+            }
+          }
+        )
+        activeSubscription = data.subscription
+      } catch (err) {
+        console.error('Error during initApp:', err)
         setUser(null)
         setProfile(null)
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setLoading(true)
-        if (session) {
-          setUser(session.user)
-          await fetchProfile(session.user.id)
-        } else {
-          setUser(null)
-          setProfile(null)
-        }
+      } finally {
         setLoading(false)
       }
-    )
+    }
+
+    initApp()
 
     return () => {
-      subscription?.unsubscribe()
+      activeSubscription?.unsubscribe()
     }
   }, [])
 

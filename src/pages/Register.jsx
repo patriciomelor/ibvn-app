@@ -11,7 +11,7 @@ export default function Register() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
-  const { register } = useAuth()
+  const { register, churchSettings } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -52,7 +52,7 @@ export default function Register() {
         {/* Cabecera */}
         <div className="flex flex-col items-center mb-8">
           <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight">Crear Cuenta</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Únete a Vida Nueva App</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Únete a {churchSettings?.name || 'Vida Nueva'} App</p>
         </div>
 
         {/* Mensaje de Éxito */}

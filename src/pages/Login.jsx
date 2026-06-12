@@ -8,7 +8,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
+  const { login, churchSettings } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -37,12 +37,16 @@ export default function Login() {
         {/* Cabecera / Logo */}
         <div className="flex flex-col items-center mb-8">
           <img 
-            src="/favicon.png" 
+            src={churchSettings?.logo_url || "/favicon.png"} 
             alt="Logo" 
-            className="w-20 h-20 rounded-2xl shadow-xl border border-indigo-500/20 mb-4 transform hover:scale-105 transition-transform" 
+            className="w-20 h-20 rounded-2xl shadow-xl border border-indigo-500/20 mb-4 transform hover:scale-105 transition-transform object-cover" 
           />
-          <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight">Vida Nueva</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Santiago, Chile</p>
+          <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight">
+            {churchSettings?.name || 'Vida Nueva'}
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+            {churchSettings?.address || 'Santiago, Chile'}
+          </p>
         </div>
 
         {/* Alerta de Error */}
