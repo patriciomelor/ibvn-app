@@ -116,4 +116,14 @@
     background: transparent !important;
     padding: 0 !important;
   }
+  }
+}
+
+/* Ocultar barra de desplazamiento manteniendo funcionalidad */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
 }

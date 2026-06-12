@@ -82,6 +82,33 @@ export default function Admin() {
   const [recursoFileUrl, setRecursoFileUrl] = useState('')
   const [editingRecursoId, setEditingRecursoId] = useState(null)
 
+  // --- NUEVOS ESTADOS MINISTERIOS CRUD ---
+  const [minNombre, setMinNombre] = useState('')
+  const [minDesc, setMinDesc] = useState('')
+  const [minLiderId, setMinLiderId] = useState('')
+  const [editingMinId, setEditingMinId] = useState(null)
+
+  // --- NUEVOS ESTADOS CHURCH SETTINGS ---
+  const { churchSettings, fetchSettings } = useAuth()
+  const [settingsForm, setSettingsForm] = useState({
+    name: '',
+    logo_url: '',
+    address: '',
+    phone: '',
+    email: '',
+    social_facebook: '',
+    social_instagram: '',
+    social_youtube: '',
+    mayordomo_name: '',
+    calendar_url: ''
+  })
+
+  useEffect(() => {
+    if (churchSettings) {
+      setSettingsForm(churchSettings)
+    }
+  }, [churchSettings])
+
   const fetchSportsAdmin = async () => {
     try {
       const { data, error } = await supabase
@@ -252,6 +279,81 @@ export default function Admin() {
     setRecursoDesc(res.description)
     setRecursoCategory(res.category)
     setRecursoFileUrl(res.file_url)
+  }
+
+  // --- HANDLERS CHURCH SETTINGS ---
+  const handleSaveChurchSettings = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const { error } = await supabase.from('church_settings').upsert({ id: 1, ...settingsForm })
+      if (error) throw error
+      setSuccessMessage('Configuración global guardada con éxito.')
+      await fetchSettings() // Update global app state
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al guardar configuración global.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // --- HANDLERS MINISTERIOS ---
+  const handleSaveMinisterio = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const payload = {
+        nombre: minNombre,
+        descripcion: minDesc,
+        lider_id: minLiderId || null
+      }
+      if (editingMinId) {
+        const { error } = await supabase.from('ministerios').update(payload).eq('id', editingMinId)
+        if (error) throw error
+        setSuccessMessage('Ministerio actualizado con éxito.')
+      } else {
+        const { error } = await supabase.from('ministerios').insert(payload)
+        if (error) throw error
+        setSuccessMessage('Ministerio creado con éxito.')
+      }
+      setMinNombre(''); setMinDesc(''); setMinLiderId(''); setEditingMinId(null)
+      await loadAdminData() // refresh ministerios
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al guardar ministerio.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEditMinisterio = (min) => {
+    setEditingMinId(min.id)
+    setMinNombre(min.nombre)
+    setMinDesc(min.descripcion || '')
+    setMinLiderId(min.lider_id || '')
+  }
+
+  const handleDeleteMinisterio = async (id) => {
+    if (!window.confirm('¿Eliminar este ministerio?')) return
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const { error } = await supabase.from('ministerios').delete().eq('id', id)
+      if (error) throw error
+      setSuccessMessage('Ministerio eliminado.')
+      await loadAdminData()
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al eliminar ministerio.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleDeleteRecurso = async (id) => {
@@ -990,6 +1092,17 @@ export default function Admin() {
         >
           <Settings className="w-4 h-4" />
           <span>Configuraciones</span>
+        </button>
+        <button
+          onClick={() => { setActiveTab('ministerios_crud'); setSelectedUser(null); }}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
+            activeTab === 'ministerios_crud'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
+          }`}
+        >
+          <Award className="w-4 h-4" />
+          <span>Ministerios</span>
         </button>
       </div>
 
@@ -2338,6 +2451,154 @@ export default function Admin() {
                 </div>
               )
             })}
+          </div>
+          
+          {/* Ajustes Globales de la App */}
+          <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
+            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white">Ajustes Globales de la App</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mt-1 mb-6">
+              Personaliza el nombre de la iglesia, logo, redes sociales y calendario para todos los usuarios.
+            </p>
+            
+            <form onSubmit={handleSaveChurchSettings} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Nombre de la Iglesia</label>
+                  <input type="text" value={settingsForm.name} onChange={e => setSettingsForm({...settingsForm, name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" required />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL del Logo</label>
+                  <input type="url" value={settingsForm.logo_url} onChange={e => setSettingsForm({...settingsForm, logo_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://..." />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Dirección Principal</label>
+                  <input type="text" value={settingsForm.address} onChange={e => setSettingsForm({...settingsForm, address: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL Calendario Público (Ej. Google Calendar HTML)</label>
+                  <input type="url" value={settingsForm.calendar_url} onChange={e => setSettingsForm({...settingsForm, calendar_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://calendar.google.com/calendar/embed?src=..." />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Teléfono Público</label>
+                  <input type="text" value={settingsForm.phone} onChange={e => setSettingsForm({...settingsForm, phone: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Email Público</label>
+                  <input type="email" value={settingsForm.email} onChange={e => setSettingsForm({...settingsForm, email: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Nombre Mayordomo / Pastor General</label>
+                  <input type="text" value={settingsForm.mayordomo_name} onChange={e => setSettingsForm({...settingsForm, mayordomo_name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Facebook URL</label>
+                  <input type="url" value={settingsForm.social_facebook} onChange={e => setSettingsForm({...settingsForm, social_facebook: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Instagram URL</label>
+                  <input type="url" value={settingsForm.social_instagram} onChange={e => setSettingsForm({...settingsForm, social_instagram: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">YouTube URL</label>
+                  <input type="url" value={settingsForm.social_youtube} onChange={e => setSettingsForm({...settingsForm, social_youtube: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                </div>
+              </div>
+              <div className="flex justify-end pt-4">
+                <button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-6 rounded-xl transition-all text-xs font-display flex items-center space-x-2">
+                  <Save className="w-4 h-4" />
+                  <span>Guardar Ajustes Globales</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 8: MINISTERIOS CRUD */}
+      {activeTab === 'ministerios_crud' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+          {/* Formulario Crear/Editar */}
+          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 h-fit sticky top-6">
+            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
+              <Award className="w-5 h-5 text-indigo-400" />
+              <span>{editingMinId ? 'Editar Ministerio' : 'Nuevo Ministerio'}</span>
+            </h3>
+            
+            <form onSubmit={handleSaveMinisterio} className="space-y-4">
+              <div>
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Nombre</label>
+                <input type="text" required value={minNombre} onChange={(e) => setMinNombre(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:border-indigo-500" placeholder="Ej: Alabanza" />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Descripción</label>
+                <textarea rows="3" value={minDesc} onChange={(e) => setMinDesc(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:border-indigo-500" placeholder="Objetivo del ministerio..."></textarea>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Líder Asignado (Opcional)</label>
+                <select value={minLiderId} onChange={(e) => setMinLiderId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:border-indigo-500">
+                  <option value="">Sin Asignar</option>
+                  {profiles.filter(p => p.rol === 'lider' || p.rol === 'pastor_admin').map(p => (
+                    <option key={p.id} value={p.id}>{p.nombre} ({p.rol})</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex gap-2 pt-2">
+                {editingMinId && (
+                  <button type="button" onClick={() => { setEditingMinId(null); setMinNombre(''); setMinDesc(''); setMinLiderId(''); }} className="w-1/3 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium py-2 rounded-xl text-xs">
+                    Cancelar
+                  </button>
+                )}
+                <button type="submit" disabled={loading} className="flex-1 flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-xl transition-all disabled:opacity-50 text-xs shadow-md">
+                  {loading ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>{editingMinId ? 'Guardar Cambios' : 'Crear Ministerio'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Listado de Ministerios */}
+          <div className="lg:col-span-2 space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">Ministerios Actuales</h3>
+            
+            {ministerios.length === 0 ? (
+              <div className="glass rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-850">
+                <p className="text-slate-500 text-xs italic">No hay ministerios registrados.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {ministerios.map((min) => {
+                  const lider = profiles.find(p => p.id === min.lider_id)
+                  return (
+                    <div key={min.id} className="glass rounded-3xl p-5 border border-slate-200 dark:border-slate-850 flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center space-x-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                          <span>{min.nombre}</span>
+                        </h4>
+                        {min.descripcion && (
+                          <p className="text-slate-500 dark:text-slate-400 text-xs mt-2 line-clamp-2">{min.descripcion}</p>
+                        )}
+                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/50">
+                          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Líder Asignado</p>
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{lider ? lider.nombre : <span className="text-slate-400 italic font-normal">Sin asignar</span>}</p>
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2 mt-4">
+                        <button onClick={() => handleEditMinisterio(min)} className="p-1.5 text-indigo-400 hover:bg-indigo-950/40 border border-indigo-500/10 rounded-lg transition-all" title="Editar">
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleDeleteMinisterio(min.id)} className="p-1.5 text-rose-400 hover:bg-rose-950/40 border border-rose-500/10 rounded-lg transition-all" title="Eliminar">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
