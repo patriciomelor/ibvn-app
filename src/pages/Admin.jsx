@@ -102,6 +102,74 @@ export default function Admin() {
     mayordomo_name: '',
     calendar_url: ''
   })
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+
+  const handleLogoUpload = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setUploadingLogo(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `logo-${Math.random()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = async () => {
+          const canvas = document.createElement('canvas')
+          const size = Math.min(img.width, img.height)
+          canvas.width = 512
+          canvas.height = 512
+          const ctx = canvas.getContext('2d')
+
+          const sx = (img.width - size) / 2
+          const sy = (img.height - size) / 2
+          ctx.drawImage(img, sx, sy, size, size, 0, 0, 512, 512)
+
+          canvas.toBlob(async (blob) => {
+            if (!blob) {
+              setUploadingLogo(false)
+              setErrorMessage('Error al procesar la imagen.')
+              return
+            }
+
+            try {
+              const { error: uploadError } = await supabase.storage
+                .from('settings')
+                .upload(filePath, blob, {
+                  contentType: 'image/jpeg'
+                })
+
+              if (uploadError) throw uploadError
+
+              const { data: { publicUrl } } = supabase.storage
+                .from('settings')
+                .getPublicUrl(filePath)
+
+              setSettingsForm(prev => ({ ...prev, logo_url: publicUrl }))
+              setSuccessMessage('Logo cargado y recortado correctamente. Recuerda guardar los cambios.')
+            } catch (uploadErr) {
+              console.error('Error uploading logo:', uploadErr.message)
+              setErrorMessage('Error al subir el logotipo a Supabase Storage.')
+            } finally {
+              setUploadingLogo(false)
+            }
+          }, 'image/jpeg', 0.9)
+        }
+        img.src = e.target.result
+      }
+      reader.readAsDataURL(file)
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al procesar el archivo.')
+      setUploadingLogo(false)
+    }
+  }
 
   useEffect(() => {
     if (churchSettings) {
@@ -2466,8 +2534,53 @@ export default function Admin() {
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Nombre de la Iglesia</label>
                   <input type="text" value={settingsForm.name || ''} onChange={e => setSettingsForm({...settingsForm, name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" required />
                 </div>
-                <div>
-                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL del Logo</label>
+                <div className="md:col-span-2 flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-500/5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 mb-2">
+                  <div className="relative w-20 h-20 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                    {settingsForm.logo_url ? (
+                      <img src={settingsForm.logo_url} alt="Logo" className="w-full h-full object-cover" />
+                    ) : (
+                      <UploadCloud className="w-8 h-8 text-slate-400" />
+                    )}
+                    {uploadingLogo && (
+                      <div className="absolute inset-0 bg-slate-950/60 flex items-center justify-center">
+                        <Loader className="w-5 h-5 text-indigo-400 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1.5 text-center sm:text-left">
+                    <h5 className="text-xs font-bold text-slate-700 dark:text-slate-200">Logotipo de la Iglesia</h5>
+                    <p className="text-[10px] text-slate-400">Sube una imagen. Se recortará automáticamente a formato cuadrado (512x512px) de alta calidad.</p>
+                    <div className="flex flex-wrap justify-center sm:justify-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById('logo-file-input').click()}
+                        disabled={uploadingLogo}
+                        className="bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600/20 border border-indigo-500/20 text-[10px] font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Seleccionar Imagen
+                      </button>
+                      <input
+                        id="logo-file-input"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleLogoUpload}
+                        disabled={uploadingLogo}
+                      />
+                      {settingsForm.logo_url && (
+                        <button
+                          type="button"
+                          onClick={() => setSettingsForm({ ...settingsForm, logo_url: '' })}
+                          className="bg-rose-600/10 text-rose-600 dark:text-rose-400 hover:bg-rose-600/20 border border-rose-500/20 text-[10px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          Eliminar Logo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL del Logo (Opcional - obtenido al subir imagen)</label>
                   <input type="url" value={settingsForm.logo_url || ''} onChange={e => setSettingsForm({...settingsForm, logo_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://..." />
                 </div>
                 <div>
