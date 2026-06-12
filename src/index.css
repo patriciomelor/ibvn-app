@@ -4,9 +4,25 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+:root {
+  --text-muted: #475569;     /* Slate 600 - readable contrast in light mode */
+  --text-secondary: #334155; /* Slate 700 - readable labels in light mode */
+  --text-light: #1e293b;     /* Slate 800 - high contrast subheadings in light mode */
+}
+
+.dark {
+  --text-muted: #94a3b8;     /* Slate 400 */
+  --text-secondary: #64748b; /* Slate 500 */
+  --text-light: #cbd5e1;     /* Slate 300 */
+}
+
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', sans-serif;
+  
+  --color-slate-300: var(--text-light);
+  --color-slate-400: var(--text-muted);
+  --color-slate-500: var(--text-secondary);
   
   --color-brand-50: #eef2ff;
   --color-brand-100: #e0e7ff;
