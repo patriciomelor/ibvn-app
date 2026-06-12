@@ -15,6 +15,32 @@ export const AuthProvider = ({ children }) => {
     deportes: false,
     recursos: false
   })
+  const [churchSettings, setChurchSettings] = useState(null)
+
+  const fetchSettings = async () => {
+    try {
+      const { data, error } = await supabase.from('church_settings').select('*').eq('id', 1).single()
+      if (!error && data) {
+        setChurchSettings(data)
+      } else {
+        // Fallback
+        setChurchSettings({
+          name: 'Vida Nueva',
+          logo_url: null,
+          address: 'Santiago, Chile',
+          phone: '',
+          email: '',
+          social_facebook: '',
+          social_instagram: '',
+          social_youtube: '',
+          mayordomo_name: '',
+          calendar_url: ''
+        })
+      }
+    } catch (err) {
+      console.warn('Error fetching church settings:', err.message)
+    }
+  }
 
   const fetchVisibility = async () => {
     try {
@@ -29,20 +55,16 @@ export const AuthProvider = ({ children }) => {
         setModuleVisibility(dict)
       }
     } catch (err) {
-      console.warn('Error fetching module visibility (table might not exist yet):', err.message)
+      console.warn('Error fetching module visibility:', err.message)
     }
   }
 
   const fetchProfile = async (userId) => {
     try {
-      // 1. Asegurar la existencia del perfil en la base de datos (auto-healing)
       try {
         await supabase.rpc('ensure_profile_exists')
-      } catch (rpcErr) {
-        console.warn('ensure_profile_exists RPC error (might not exist yet):', rpcErr.message)
-      }
+      } catch (rpcErr) {}
 
-      // 2. Consultar el perfil
       let { data, error } = await supabase
         .from('profiles')
         .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
@@ -50,9 +72,6 @@ export const AuthProvider = ({ children }) => {
         .single()
       
       if (error) {
-        console.error('Error fetching profile:', error.message)
-        
-        // Fallback: si falla por no existir (PGRST116), intentar insertar desde el cliente
         if (error.code === 'PGRST116') {
           try {
             const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -70,29 +89,26 @@ export const AuthProvider = ({ children }) => {
               
               if (!insertError && fallbackProfile) {
                 setProfile(fallbackProfile)
-                // Insertar también registro espiritual
                 await supabase.from('spiritual_records').insert({ user_id: userId })
                 return
               }
             }
-          } catch (fallbackErr) {
-            console.error('Profile fallback creation failed:', fallbackErr.message)
-          }
+          } catch (fallbackErr) {}
         }
-        
         setProfile(null)
       } else {
         setProfile(data)
       }
     } catch (err) {
-      console.error('Unexpected error fetching profile:', err)
+      console.error(err)
       setProfile(null)
     }
   }
 
   useEffect(() => {
     fetchVisibility()
-    // 1. Verificar sesión activa inicial de manera segura
+    fetchSettings()
+    
     supabase.auth.getSession()
       .then(async ({ data: { session } }) => {
         if (session) {
@@ -104,7 +120,6 @@ export const AuthProvider = ({ children }) => {
         }
       })
       .catch((err) => {
-        console.error('Error al verificar sesión inicial en Supabase:', err.message)
         setUser(null)
         setProfile(null)
       })
@@ -112,7 +127,6 @@ export const AuthProvider = ({ children }) => {
         setLoading(false)
       })
 
-    // 2. Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setLoading(true)
@@ -134,33 +148,17 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     setLoading(true)
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    if (error) {
-      setLoading(false)
-      throw error
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) { setLoading(false); throw error; }
     return data
   }
 
   const register = async (email, password, nombre) => {
     setLoading(true)
     const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          nombre: nombre,
-        },
-      },
+      email, password, options: { data: { nombre: nombre } }
     })
-    if (error) {
-      setLoading(false)
-      throw error
-    }
-    // Nota: El trigger en Postgres creará automáticamente el registro en public.profiles.
+    if (error) { setLoading(false); throw error; }
     return data
   }
 
@@ -200,6 +198,10 @@ export const AuthProvider = ({ children }) => {
     isLider: profile?.rol === 'lider' || profile?.rol === 'pastor_admin',
     moduleVisibility,
     refreshVisibility: fetchVisibility,
+    churchSettings,
+    fetchSettings,
+    resetPassword: () => {},
+    refreshProfile: () => user && fetchProfile(user.id)
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

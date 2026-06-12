@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, History, User, ShieldCheck, LogOut, LogIn, Globe, Award, Activity, FileText, Download } from 'lucide-react'
+import { BookOpen, History, User, ShieldCheck, LogOut, LogIn, Globe, Award, Activity, FileText, Download, Calendar as CalendarIcon } from 'lucide-react'
 import OnboardingModal from './OnboardingModal'
 
 export default function Layout({ children }) {
-  const { profile, logout, isPastorAdmin, moduleVisibility } = useAuth()
+  const { profile, logout, isPastorAdmin, moduleVisibility, churchSettings } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const [installPrompt, setInstallPrompt] = useState(null)
@@ -36,6 +36,10 @@ export default function Layout({ children }) {
     { path: '/deportes', label: 'Deportes', icon: Activity },
     { path: '/recursos', label: 'Recursos', icon: FileText },
   ]
+
+  if (churchSettings?.calendar_url) {
+    navItems.push({ path: '/calendario', label: 'Calendario', icon: CalendarIcon }) // We need to import Calendar from lucide-react, aliased or renamed
+  }
 
   // Filtrar ítems de navegación según estado de autenticación y configuraciones de visibilidad
   const visibleNavItems = navItems.filter(item => {
@@ -80,10 +84,10 @@ export default function Layout({ children }) {
       <aside className="hidden md:flex md:w-64 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shrink-0 sticky top-0 h-screen p-5">
         {/* Header Logo */}
         <div className="flex items-center space-x-3 mb-8 px-2">
-          <img src="/favicon.png" alt="Logo Vida Nueva" className="w-10 h-10 rounded-xl shadow-lg border border-indigo-500/20" />
+          <img src={churchSettings?.logo_url || "/favicon.png"} alt="Logo Iglesia" className="w-10 h-10 rounded-xl shadow-lg border border-indigo-500/20 object-cover" />
           <div>
-            <h1 className="text-lg font-bold font-display tracking-tight text-slate-900 dark:text-white m-0 leading-tight">Vida Nueva</h1>
-            <span className="text-xs text-indigo-400 font-medium">Santiago, Chile</span>
+            <h1 className="text-lg font-bold font-display tracking-tight text-slate-900 dark:text-white m-0 leading-tight">{churchSettings?.name || 'Vida Nueva'}</h1>
+            <span className="text-xs text-indigo-400 font-medium">{churchSettings?.address || 'Santiago, Chile'}</span>
           </div>
         </div>
 
@@ -157,41 +161,61 @@ export default function Layout({ children }) {
       </aside>
 
       {/* 2. HEADER PARA MÓVIL */}
-      <header className="md:hidden flex items-center justify-between px-5 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40">
-        <div className="flex items-center space-x-3">
-          <img src="/favicon.png" alt="Logo Vida Nueva" className="w-8 h-8 rounded-lg border border-indigo-500/20" />
-          <span className="text-md font-bold font-display text-slate-900 dark:text-white tracking-wide">Vida Nueva App</span>
+      <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40">
+        <div className="flex items-center space-x-2 truncate">
+          <img src={churchSettings?.logo_url || "/favicon.png"} alt="Logo" className="w-8 h-8 rounded-lg shadow-sm border border-indigo-500/20 object-cover shrink-0" />
+          <h1 className="text-sm font-bold font-display tracking-tight text-slate-900 dark:text-white truncate">{churchSettings?.name || 'Vida Nueva'}</h1>
         </div>
         
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-1 shrink-0">
           {installPrompt && (
             <button
               onClick={handleInstallClick}
-              className="p-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+              className="p-1.5 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
               title="Instalar App"
             >
               <Download className="w-5 h-5" />
             </button>
           )}
+
+          {profile && isPastorAdmin && (
+            <Link
+              to="/admin"
+              className="p-1.5 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              title="Administración"
+            >
+              <ShieldCheck className="w-5 h-5" />
+            </Link>
+          )}
+
+          {profile ? (
+            <Link
+              to="/profile"
+              className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Mi Perfil"
+            >
+              <User className="w-5 h-5" />
+            </Link>
+          ) : (
+            <Link
+              to="/login"
+              className="p-1.5 text-indigo-400 hover:text-indigo-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Iniciar Sesión"
+            >
+              <LogIn className="w-5 h-5" />
+            </Link>
+          )}
         
-        {/* Mini botón logout en móvil */}
-        {profile ? (
-          <button
-            onClick={handleLogout}
-            className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-100 dark:bg-slate-800 transition-colors"
-            title="Cerrar Sesión"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-        ) : (
-          <button
-            onClick={() => navigate('/login')}
-            className="p-2 text-indigo-400 hover:text-indigo-300 rounded-lg hover:bg-slate-805 transition-colors"
-            title="Iniciar Sesión"
-          >
-            <LogIn className="w-5 h-5" />
-          </button>
-        )}
+          {/* Mini botón logout en móvil */}
+          {profile && (
+            <button
+              onClick={handleLogout}
+              className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Cerrar Sesión"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </header>
 
@@ -203,23 +227,25 @@ export default function Layout({ children }) {
       </main>
 
       {/* 4. BOTTOM BAR (Navegación Móvil) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 px-2 py-2 flex justify-around shadow-lg">
-        {visibleNavItems.map((item) => {
-          const Icon = item.icon
-          const active = isActive(item.path)
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all duration-200 ${
-                active ? 'text-indigo-400' : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium">{item.label}</span>
-            </Link>
-          )
-        })}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 px-2 py-2 flex overflow-x-auto hide-scrollbar shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        <div className="flex w-max min-w-full justify-around space-x-1">
+          {visibleNavItems.filter(item => !['/profile', '/admin', '/login'].includes(item.path)).map((item) => {
+            const Icon = item.icon
+            const active = isActive(item.path)
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex flex-col items-center justify-center min-w-[60px] px-2 py-1 rounded-xl transition-all duration-200 ${
+                  active ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-500 dark:text-slate-400'
+                }`}
+              >
+                <Icon className={`w-5 h-5 mb-1 ${active ? 'animate-bounce-short' : ''}`} />
+                <span className="text-[10px] font-medium leading-tight whitespace-nowrap">{item.label}</span>
+              </Link>
+            )
+          })}
+        </div>
       </nav>
     </div>
   )
