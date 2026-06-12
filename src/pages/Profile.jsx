@@ -439,6 +439,11 @@ export default function Profile() {
               </div>
 
               <div className="p-3 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
+                <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">Cargo Eclesiástico</span>
+                <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">{profile?.cargo || 'Miembro'}</span>
+              </div>
+
+              <div className="p-3 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
                 <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">Grupo Pequeño / Célula</span>
                 <span className="text-slate-700 dark:text-slate-200 text-sm font-semibold">
                   {profile?.celulas?.nombre || 'No asignada todavía'}

@@ -470,10 +470,24 @@ export default function Admin() {
     setErrorMessage('')
     setSuccessMessage('')
     try {
+      const labelMap = {
+        devocional: 'Devocional Diario',
+        archive: 'Historial de Devocionales',
+        misiones: 'Misiones',
+        escuela: 'Escuela de Líderes',
+        deportes: 'Deportes y Recreación',
+        recursos: 'Biblioteca de Recursos',
+        calendario: 'Calendario Oficial'
+      }
+
       const { error } = await supabase
         .from('module_visibility')
-        .update({ is_public: !currentStatus })
-        .eq('module_key', moduleKey)
+        .upsert({ 
+          module_key: moduleKey, 
+          label: labelMap[moduleKey] || moduleKey,
+          is_public: !currentStatus 
+        }, { onConflict: 'module_key' })
+
       if (error) throw error
       setSuccessMessage(`¡Visibilidad del módulo actualizada con éxito!`)
       await refreshVisibility()
@@ -814,6 +828,7 @@ export default function Admin() {
         .from('profiles')
         .update({
           rol: selectedUser.rol,
+          cargo: selectedUser.cargo || 'Miembro',
           celula_id: selectedUser.celula_id || null,
           ministerio_id: selectedUser.ministerio_id || null,
           mentor_id: selectedUser.mentor_id || null,
@@ -992,6 +1007,7 @@ export default function Admin() {
       'Telefono',
       'Direccion',
       'Rol',
+      'Cargo',
       'Celula',
       'Ministerio',
       'Fecha Registro'
@@ -1003,6 +1019,7 @@ export default function Admin() {
       p.tel || '',
       p.direccion || '',
       p.rol,
+      p.cargo || 'Miembro',
       p.celulas?.nombre || 'Ninguna',
       p.ministerios?.nombre || 'Ninguno',
       new Date(p.created_at).toLocaleDateString('es-CL')
@@ -1421,7 +1438,7 @@ export default function Admin() {
                     >
                       <div>
                         <p className="font-semibold text-slate-700 dark:text-slate-200 text-xs">{member.nombre}</p>
-                        <span className="text-[10px] text-slate-500 capitalize">{member.rol}</span>
+                        <span className="text-[10px] text-slate-500 capitalize">{member.rol} • {member.cargo || 'Miembro'}</span>
                       </div>
                       <ChevronRight className="w-4 h-4 text-slate-600" />
                     </button>
@@ -1609,8 +1626,8 @@ export default function Admin() {
                 {crmTab === 'discipulado' && (
                   <form onSubmit={handleUpdateMemberConfig} className="space-y-6 animate-fade-in">
                     
-                    {/* Asignación de Rol y Mentor */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    {/* Asignación de Rol, Cargo y Mentor */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                       <div>
                         <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Rol del Miembro</label>
                         <select
@@ -1621,6 +1638,22 @@ export default function Admin() {
                           <option value="miembro">Miembro / Asistente</option>
                           <option value="lider">Líder de Ministerio / Célula</option>
                           <option value="pastor_admin">Pastor / Administrador</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Cargo Eclesiástico</label>
+                        <select
+                          value={selectedUser.cargo || 'Miembro'}
+                          onChange={(e) => setSelectedUser({ ...selectedUser, cargo: e.target.value })}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
+                        >
+                          <option value="Miembro">Miembro</option>
+                          <option value="Colaborador">Colaborador</option>
+                          <option value="Líder de Célula">Líder de Célula</option>
+                          <option value="Coordinador de Ministerio">Coordinador de Ministerio</option>
+                          <option value="Diácono">Diácono</option>
+                          <option value="Pastor">Pastor</option>
                         </select>
                       </div>
 
@@ -2497,6 +2530,7 @@ export default function Admin() {
               { key: 'escuela', label: 'Escuela de Líderes', desc: 'Permite visualizar los temas y lecciones de la Escuela. El avance personal seguirá requiriendo login.' },
               { key: 'deportes', label: 'Deportes y Recreación', desc: 'Permite ver los próximos partidos y salidas. Inscribirse y ver participantes requerirá login.' },
               { key: 'recursos', label: 'Biblioteca de Recursos', desc: 'Permite descargar manuales de apoyo doctrinal y el Kit Replicable a cualquier visitante.' },
+              { key: 'calendario', label: 'Calendario Oficial', desc: 'Permite visualizar el calendario de actividades a invitados sin iniciar sesión.' },
             ].map((mod) => {
               const isPublic = moduleVisibility && moduleVisibility[mod.key] === true
               return (

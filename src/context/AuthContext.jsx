@@ -13,7 +13,8 @@ export const AuthProvider = ({ children }) => {
     misiones: false,
     escuela: false,
     deportes: false,
-    recursos: false
+    recursos: false,
+    calendario: false
   })
   const [churchSettings, setChurchSettings] = useState(null)
 
@@ -67,7 +68,7 @@ export const AuthProvider = ({ children }) => {
 
       let { data, error } = await supabase
         .from('profiles')
-        .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
+        .select('*, cargo, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
         .eq('id', userId)
         .single()
       
@@ -84,7 +85,7 @@ export const AuthProvider = ({ children }) => {
                   nombre: authUser.user_metadata?.nombre || authUser.user_metadata?.name || 'Miembro Nuevo',
                   rol: 'miembro'
                 })
-                .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
+                .select('*, cargo, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
                 .single()
               
               if (!insertError && fallbackProfile) {
@@ -177,7 +178,7 @@ export const AuthProvider = ({ children }) => {
       .from('profiles')
       .update(updates)
       .eq('id', user.id)
-      .select('*, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
+      .select('*, cargo, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
       .single()
     
     if (error) throw error

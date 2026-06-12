@@ -35,11 +35,8 @@ export default function Layout({ children }) {
     { path: '/escuela', label: 'Escuela', icon: Award },
     { path: '/deportes', label: 'Deportes', icon: Activity },
     { path: '/recursos', label: 'Recursos', icon: FileText },
+    { path: '/calendario', label: 'Calendario', icon: CalendarIcon },
   ]
-
-  if (churchSettings?.calendar_url) {
-    navItems.push({ path: '/calendario', label: 'Calendario', icon: CalendarIcon }) // We need to import Calendar from lucide-react, aliased or renamed
-  }
 
   // Filtrar ítems de navegación según estado de autenticación y configuraciones de visibilidad
   const visibleNavItems = navItems.filter(item => {
@@ -103,7 +100,7 @@ export default function Layout({ children }) {
           <div className="overflow-hidden">
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{profile?.nombre || 'Invitado'}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">
-              {profile ? (profile.rol === 'pastor_admin' ? 'Pastor / Admin' : profile.rol) : 'Navegación Pública'}
+              {profile ? (profile.cargo || (profile.rol === 'pastor_admin' ? 'Pastor / Admin' : profile.rol)) : 'Navegación Pública'}
             </p>
           </div>
         </div>

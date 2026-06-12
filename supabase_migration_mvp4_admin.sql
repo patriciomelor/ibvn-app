@@ -27,7 +27,8 @@ INSERT INTO public.module_visibility (module_key, label, is_public) VALUES
 ('misiones', 'Misiones', false),
 ('escuela', 'Escuela de Líderes', false),
 ('deportes', 'Deportes y Recreación', false),
-('recursos', 'Biblioteca de Recursos', false)
+('recursos', 'Biblioteca de Recursos', false),
+('calendario', 'Calendario Oficial', false)
 ON CONFLICT (module_key) DO UPDATE SET label = EXCLUDED.label;
 
 
@@ -116,4 +117,9 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- 5. GESTOR DE CARGOS: COLUMNA DE CARGO EN TABLA PROFILES
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS cargo TEXT DEFAULT 'Miembro';
+
 
