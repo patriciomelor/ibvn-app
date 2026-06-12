@@ -40,6 +40,19 @@ function ProtectedRoute({ children, moduleKey, adminOnly = false }) {
     if (isPublic) {
       return <Layout>{children}</Layout>
     }
+
+    // Si es la página de inicio (devocional) y es privada, intentar redirigir al primer módulo público disponible
+    if (moduleKey === 'devocional') {
+      const publicKeys = Object.keys(moduleVisibility || {}).filter(k => moduleVisibility[k] === true)
+      if (publicKeys.length > 0) {
+        const firstPublic = publicKeys[0]
+        const targetPath = firstPublic === 'devocional' ? '/' : `/${firstPublic}`
+        if (targetPath !== '/') {
+          return <Navigate to={targetPath} replace />
+        }
+      }
+    }
+
     return <Navigate to="/login" replace />
   }
 
