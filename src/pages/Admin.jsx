@@ -2464,45 +2464,45 @@ export default function Admin() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Nombre de la Iglesia</label>
-                  <input type="text" value={settingsForm.name} onChange={e => setSettingsForm({...settingsForm, name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" required />
+                  <input type="text" value={settingsForm.name || ''} onChange={e => setSettingsForm({...settingsForm, name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" required />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL del Logo</label>
-                  <input type="url" value={settingsForm.logo_url} onChange={e => setSettingsForm({...settingsForm, logo_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://..." />
+                  <input type="url" value={settingsForm.logo_url || ''} onChange={e => setSettingsForm({...settingsForm, logo_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://..." />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Dirección Principal</label>
-                  <input type="text" value={settingsForm.address} onChange={e => setSettingsForm({...settingsForm, address: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="text" value={settingsForm.address || ''} onChange={e => setSettingsForm({...settingsForm, address: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL Calendario Público (Ej. Google Calendar HTML)</label>
-                  <input type="url" value={settingsForm.calendar_url} onChange={e => setSettingsForm({...settingsForm, calendar_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://calendar.google.com/calendar/embed?src=..." />
+                  <input type="url" value={settingsForm.calendar_url || ''} onChange={e => setSettingsForm({...settingsForm, calendar_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://calendar.google.com/calendar/embed?src=..." />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Teléfono Público</label>
-                  <input type="text" value={settingsForm.phone} onChange={e => setSettingsForm({...settingsForm, phone: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="text" value={settingsForm.phone || ''} onChange={e => setSettingsForm({...settingsForm, phone: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Email Público</label>
-                  <input type="email" value={settingsForm.email} onChange={e => setSettingsForm({...settingsForm, email: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="email" value={settingsForm.email || ''} onChange={e => setSettingsForm({...settingsForm, email: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Nombre Mayordomo / Pastor General</label>
-                  <input type="text" value={settingsForm.mayordomo_name} onChange={e => setSettingsForm({...settingsForm, mayordomo_name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="text" value={settingsForm.mayordomo_name || ''} onChange={e => setSettingsForm({...settingsForm, mayordomo_name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 dark:border-slate-800 pt-4">
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Facebook URL</label>
-                  <input type="url" value={settingsForm.social_facebook} onChange={e => setSettingsForm({...settingsForm, social_facebook: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="url" value={settingsForm.social_facebook || ''} onChange={e => setSettingsForm({...settingsForm, social_facebook: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Instagram URL</label>
-                  <input type="url" value={settingsForm.social_instagram} onChange={e => setSettingsForm({...settingsForm, social_instagram: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="url" value={settingsForm.social_instagram || ''} onChange={e => setSettingsForm({...settingsForm, social_instagram: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">YouTube URL</label>
-                  <input type="url" value={settingsForm.social_youtube} onChange={e => setSettingsForm({...settingsForm, social_youtube: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="url" value={settingsForm.social_youtube || ''} onChange={e => setSettingsForm({...settingsForm, social_youtube: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
               </div>
               <div className="flex justify-end pt-4">
