@@ -32,8 +32,8 @@ export default function Register() {
       await register(email, password, nombre)
       setSuccess(true)
       setTimeout(() => {
-        navigate('/')
-      }, 2000)
+        navigate('/login')
+      }, 5000)
     } catch (err) {
       console.error(err)
       setError(err.message || 'Ocurrió un error al registrar el usuario.')
@@ -59,7 +59,7 @@ export default function Register() {
         {success && (
           <div className="glass-emerald flex items-start space-x-2 p-4 rounded-xl text-emerald-300 text-sm mb-6 animate-fade-in">
             <CheckCircle className="w-5 h-5 shrink-0 text-emerald-400" />
-            <span>¡Registro exitoso! Redireccionando a la aplicación...</span>
+            <span>¡Registro exitoso! Por favor, revisa tu bandeja de entrada o carpeta de spam para verificar tu correo antes de iniciar sesión.</span>
           </div>
         )}
 
