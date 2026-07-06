@@ -64,14 +64,14 @@ export const AuthProvider = ({ children }) => {
     try {
       try {
         await supabase.rpc('ensure_profile_exists')
-      } catch (rpcErr) {}
+      } catch (rpcErr) { }
 
       let { data, error } = await supabase
         .from('profiles')
         .select('*, cargo, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
         .eq('id', userId)
         .single()
-      
+
       if (error) {
         if (error.code === 'PGRST116') {
           try {
@@ -87,14 +87,14 @@ export const AuthProvider = ({ children }) => {
                 })
                 .select('*, cargo, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
                 .single()
-              
+
               if (!insertError && fallbackProfile) {
                 setProfile(fallbackProfile)
                 await supabase.from('spiritual_records').insert({ user_id: userId })
                 return
               }
             }
-          } catch (fallbackErr) {}
+          } catch (fallbackErr) { }
         }
         setProfile(null)
       } else {
@@ -111,7 +111,7 @@ export const AuthProvider = ({ children }) => {
 
     // 1. Title & Meta description
     document.title = `${settings.name || 'Vida Nueva'} App`
-    
+
     const metaDesc = document.querySelector('meta[name="description"]')
     if (metaDesc) {
       metaDesc.setAttribute('content', `Aplicación oficial de ${settings.name || 'Vida Nueva'}.`)
@@ -121,7 +121,7 @@ export const AuthProvider = ({ children }) => {
     const iconUrl = settings.logo_url || '/favicon.png'
     const favicon = document.querySelector('link[rel="icon"]')
     if (favicon) favicon.setAttribute('href', iconUrl)
-    
+
     const appleIcon = document.querySelector('link[rel="apple-touch-icon"]')
     if (appleIcon) appleIcon.setAttribute('href', iconUrl)
 
@@ -162,7 +162,7 @@ export const AuthProvider = ({ children }) => {
         }
       ]
     }
-    
+
     const stringManifest = JSON.stringify(dynamicManifest)
     const blob = new Blob([stringManifest], { type: 'application/json' })
     const manifestURL = URL.createObjectURL(blob)
@@ -239,6 +239,7 @@ export const AuthProvider = ({ children }) => {
       email, password, options: { data: { nombre: nombre } }
     })
     if (error) { setLoading(false); throw error; }
+    setLoading(false)
     return data
   }
 
@@ -259,7 +260,7 @@ export const AuthProvider = ({ children }) => {
       .eq('id', user.id)
       .select('*, cargo, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
       .single()
-    
+
     if (error) throw error
     setProfile(data)
     return data
@@ -280,7 +281,7 @@ export const AuthProvider = ({ children }) => {
     refreshVisibility: fetchVisibility,
     churchSettings,
     fetchSettings,
-    resetPassword: () => {},
+    resetPassword: () => { },
     refreshProfile: () => user && fetchProfile(user.id)
   }
 
