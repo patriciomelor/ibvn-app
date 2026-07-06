@@ -26,7 +26,7 @@ INSERT INTO public.module_visibility (module_key, label, is_public) VALUES
 ('archive', 'Historial de Devocionales', false),
 ('misiones', 'Misiones', false),
 ('escuela', 'Escuela de Líderes', false),
-('deportes', 'Deportes y Recreación', false),
+('deportes', 'Actividades', false),
 ('recursos', 'Biblioteca de Recursos', false),
 ('calendario', 'Calendario Oficial', false)
 ON CONFLICT (module_key) DO UPDATE SET label = EXCLUDED.label;

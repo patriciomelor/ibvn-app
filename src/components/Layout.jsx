@@ -33,7 +33,7 @@ export default function Layout({ children }) {
     { path: '/archive', label: 'Historial', icon: History },
     { path: '/misiones', label: 'Misiones', icon: Globe },
     { path: '/escuela', label: 'Escuela', icon: Award },
-    { path: '/deportes', label: 'Deportes', icon: Activity },
+    { path: '/deportes', label: 'Actividades', icon: Activity },
     { path: '/recursos', label: 'Recursos', icon: FileText },
     { path: '/calendario', label: 'Calendario', icon: CalendarIcon },
   ]

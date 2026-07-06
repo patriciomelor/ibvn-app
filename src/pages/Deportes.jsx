@@ -180,10 +180,10 @@ export default function Deportes() {
         <div>
           <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight flex items-center space-x-2">
             <Activity className="w-8 h-8 text-indigo-500" />
-            <span>Deportes y Recreación</span>
+            <span>Actividades</span>
           </h2>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Espacios deportivos y recreativos para compartir en comunidad. Inscríbete y participa en nuestros próximos encuentros.
+            Espacios de actividades y recreación para compartir en comunidad. Inscríbete y participa en nuestros próximos encuentros.
           </p>
         </div>
         {isLider && (
