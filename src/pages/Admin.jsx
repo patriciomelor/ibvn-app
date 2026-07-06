@@ -475,7 +475,7 @@ export default function Admin() {
         archive: 'Historial de Devocionales',
         misiones: 'Misiones',
         escuela: 'Escuela de Líderes',
-        deportes: 'Deportes y Recreación',
+        deportes: 'Actividades',
         recursos: 'Biblioteca de Recursos',
         calendario: 'Calendario Oficial'
       }
@@ -1143,7 +1143,7 @@ export default function Admin() {
           }`}
         >
           <Calendar className="w-4 h-4" />
-          <span>Deportes</span>
+          <span>Actividades</span>
         </button>
         <button
           onClick={() => { setActiveTab('recursos'); setSelectedUser(null); }}
@@ -2528,7 +2528,7 @@ export default function Admin() {
               { key: 'archive', label: 'Historial de Devocionales', desc: 'Permite ver devocionales de semanas anteriores.' },
               { key: 'misiones', label: 'Misiones y Campo', desc: 'Permite visualizar pueblos y reportes de misioneros. Comprometerse a orar seguirá requiriendo login.' },
               { key: 'escuela', label: 'Escuela de Líderes', desc: 'Permite visualizar los temas y lecciones de la Escuela. El avance personal seguirá requiriendo login.' },
-              { key: 'deportes', label: 'Deportes y Recreación', desc: 'Permite ver los próximos partidos y salidas. Inscribirse y ver participantes requerirá login.' },
+              { key: 'deportes', label: 'Actividades', desc: 'Permite ver las próximas actividades y salidas. Inscribirse y ver participantes requerirá login.' },
               { key: 'recursos', label: 'Biblioteca de Recursos', desc: 'Permite descargar manuales de apoyo doctrinal y el Kit Replicable a cualquier visitante.' },
               { key: 'calendario', label: 'Calendario Oficial', desc: 'Permite visualizar el calendario de actividades a invitados sin iniciar sesión.' },
             ].map((mod) => {
