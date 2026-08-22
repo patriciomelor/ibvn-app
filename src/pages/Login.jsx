@@ -98,7 +98,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-3 rounded-xl shadow-lg shadow-indigo-950/50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none text-sm font-display"
+            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-xl shadow-lg shadow-indigo-950/50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none text-sm font-display"
           >
             {loading ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
           </button>

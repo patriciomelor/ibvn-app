@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { User, Phone, MapPin, Calendar, Heart, Shield, CheckCircle, Save, Loader, AlertCircle, Laptop, Sun, Moon, Camera } from 'lucide-react'
+import { User, Phone, MapPin, Calendar, Heart, Shield, CheckCircle, Save, Loader, AlertCircle, Laptop, Sun, Moon, Camera, MessageSquare } from 'lucide-react'
 
 export default function Profile() {
   const { user, profile, updateProfile } = useAuth()
@@ -15,6 +15,7 @@ export default function Profile() {
   const [comoLlego, setComoLlego] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [whatsappOptin, setWhatsappOptin] = useState(false)
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -82,6 +83,7 @@ export default function Profile() {
         setFechaNacimiento(profData.fecha_nacimiento || '')
         setComoLlego(profData.como_llego || '')
         setAvatarUrl(profData.avatar_url || '')
+        setWhatsappOptin(profData.whatsapp_optin || false)
       }
 
       // 3. Cargar registro espiritual
@@ -163,13 +165,13 @@ export default function Profile() {
         return
       }
 
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`
+      const fileExt = file.name.split('.').pop().toLowerCase()
+      const fileName = `${user.id}.${fileExt}`
       const filePath = `${fileName}`
 
       let { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file)
+        .upload(filePath, file, { upsert: true })
 
       if (uploadError) throw uploadError
 
@@ -177,8 +179,9 @@ export default function Profile() {
         .from('avatars')
         .getPublicUrl(filePath)
 
-      setAvatarUrl(publicUrl)
-      await updateProfile({ avatar_url: publicUrl })
+      const urlWithCacheBust = `${publicUrl}?t=${Date.now()}`
+      setAvatarUrl(urlWithCacheBust)
+      await updateProfile({ avatar_url: urlWithCacheBust })
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
     } catch (error) {
@@ -369,7 +372,7 @@ export default function Profile() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 text-sm font-display"
+                  className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 text-sm font-display"
                 >
                   {saving ? (
                     <>
@@ -418,6 +421,44 @@ export default function Profile() {
                   </button>
                 )
               })}
+            </div>
+          </div>
+
+          {/* Preferencias de Notificación */}
+          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850">
+            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
+              <MessageSquare className="w-5 h-5 text-indigo-400" />
+              <span>Preferencias de Notificación</span>
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Configura cómo deseas recibir las comunicaciones de la iglesia.</p>
+            
+            <div className="p-4 bg-slate-50/80 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">Notificaciones por WhatsApp</h4>
+                <p className="text-slate-500 text-[10px] leading-relaxed max-w-sm">
+                  Recibe avisos de nuevos devocionales, actividades y comunicados directamente a tu WhatsApp.
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  const newVal = !whatsappOptin
+                  setWhatsappOptin(newVal)
+                  try {
+                    await updateProfile({
+                      whatsapp_optin: newVal,
+                      whatsapp_optin_date: new Date().toISOString()
+                    })
+                  } catch (err) {
+                    console.error(err)
+                    setWhatsappOptin(!newVal)
+                  }
+                }}
+                className={`w-14 h-7 rounded-full p-1 transition-all duration-300 flex items-center shrink-0 ${
+                  whatsappOptin ? 'bg-emerald-500 justify-end' : 'bg-slate-200 dark:bg-slate-800 justify-start'
+                }`}
+              >
+                <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all"></div>
+              </button>
             </div>
           </div>
         </div>

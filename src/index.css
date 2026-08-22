@@ -118,21 +118,18 @@
   animation: fadeIn 0.3s ease-out forwards;
 }
 
-/* Estilo para impresión en PDF */
-@media print {
-  body {
-    background: white;
-    color: black;
+/* Animación slide-in para drawer móvil */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
   }
-  .no-print {
-    display: none !important;
+  to {
+    transform: translateX(0);
   }
-  .print-card {
-    border: none !important;
-    box-shadow: none !important;
-    background: transparent !important;
-    padding: 0 !important;
-  }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.25s ease-out forwards;
 }
 
 /* Ocultar barra de desplazamiento manteniendo funcionalidad */

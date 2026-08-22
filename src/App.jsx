@@ -13,6 +13,7 @@ import EscuelaLideres from './pages/EscuelaLideres'
 import Deportes from './pages/Deportes'
 import Recursos from './pages/Recursos'
 import Calendario from './pages/Calendario'
+import Notificaciones from './pages/Notificaciones'
 
 function ProtectedRoute({ children, moduleKey, adminOnly = false }) {
   const { user, loading, isPastorAdmin, moduleVisibility } = useAuth()
@@ -122,6 +123,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="calendario">
                 <Calendario />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notificaciones"
+            element={
+              <ProtectedRoute moduleKey="notificaciones">
+                <Notificaciones />
               </ProtectedRoute>
             }
           />

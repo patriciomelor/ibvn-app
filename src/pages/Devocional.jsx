@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, Calendar, Save, Share2, Printer, CheckCircle, Loader, AlertCircle } from 'lucide-react'
+import { BookOpen, Calendar, Save, Share2, CheckCircle, Loader, AlertCircle } from 'lucide-react'
 
 export default function Devocional() {
   const { user } = useAuth()
@@ -138,10 +138,7 @@ https://vidanueva.app/`
       })
   }
 
-  // 5. Imprimir devocional
-  const handlePrint = () => {
-    window.print()
-  }
+
 
   if (loading) {
     return (
@@ -166,22 +163,10 @@ https://vidanueva.app/`
 
   return (
     <div className="space-y-8">
-      {/* SECCIÓN DE IMPRESIÓN EXCLUSIVA (Oculta en web, visible en print) */}
-      <div className="hidden print:block print-card">
-        <h1 className="text-2xl font-bold mb-1">{devocional.titulo}</h1>
-        <p className="text-sm text-gray-600 mb-4">Pasaje: {devocional.texto_biblico} | Semana {devocional.semana}</p>
-        <div className="mb-4">
-          <h3 className="font-bold text-md mb-1">Reflexión</h3>
-          <p className="text-gray-800 text-justify">{devocional.reflexion}</p>
-        </div>
-        <div>
-          <h3 className="font-bold text-md mb-1">Oración</h3>
-          <p className="text-gray-800 italic">{devocional.oracion}</p>
-        </div>
-      </div>
+
 
       {/* VISTA EN PANTALLA */}
-      <div className="print:hidden space-y-8">
+      <div className="space-y-8">
         
         {/* Cabecera del Devocional */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/80 dark:bg-slate-900/40 p-6 rounded-3xl border border-slate-200/60 dark:border-slate-800/60">
@@ -205,13 +190,7 @@ https://vidanueva.app/`
               <Share2 className="w-4 h-4" />
               <span className="hidden sm:inline">Compartir</span>
             </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-700/50 px-3.5 py-2 rounded-xl text-xs font-medium transition-all active:scale-95"
-            >
-              <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">Imprimir / PDF</span>
-            </button>
+
           </div>
         </div>
 
