@@ -1123,28 +1123,7 @@ export default function Admin() {
           <Activity className="w-4 h-4" />
           <span>Métricas y Alertas ({unresolvedAlerts.length})</span>
         </button>
-        <button
-          onClick={() => { setActiveTab('misiones'); setSelectedUser(null); }}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
-            activeTab === 'misiones'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
-          }`}
-        >
-          <Globe className="w-4 h-4" />
-          <span>Viajes Misioneros</span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('deportes'); setSelectedUser(null); }}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
-            activeTab === 'deportes'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          <span>Actividades</span>
-        </button>
+        {/* Tabs ocultos temporalmente: Misiones y Actividades */}
         <button
           onClick={() => { setActiveTab('recursos'); setSelectedUser(null); }}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
@@ -2533,20 +2512,24 @@ export default function Admin() {
               { key: 'calendario', label: 'Calendario Oficial', desc: 'Permite visualizar el calendario de actividades a invitados sin iniciar sesión.' },
             ].map((mod) => {
               const isPublic = moduleVisibility && moduleVisibility[mod.key] === true
+              const isHidden = ['misiones', 'escuela', 'deportes'].includes(mod.key)
               return (
-                <div key={mod.key} className="p-5 bg-slate-50/80 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-850 flex items-center justify-between gap-6 hover:border-slate-200 dark:border-slate-800 transition-all">
+                <div key={mod.key} className={`p-5 rounded-2xl border flex items-center justify-between gap-6 transition-all ${isHidden ? 'bg-slate-100/50 dark:bg-slate-950/40 border-slate-200/50 dark:border-slate-900 opacity-60' : 'bg-slate-50/80 dark:bg-slate-900/40 border-slate-200 dark:border-slate-850 hover:border-slate-200 dark:border-slate-800'}`}>
                   <div className="space-y-1">
-                    <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">{mod.label}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">{mod.label}</h4>
+                      {isHidden && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-md">Módulo Oculto</span>
+                      )}
+                    </div>
                     <p className="text-slate-500 text-[10px] leading-relaxed max-w-sm">{mod.desc}</p>
                   </div>
                   
                   {/* Toggle Button */}
                   <button
-                    onClick={() => handleToggleVisibility(mod.key, isPublic)}
-                    disabled={loading}
-                    className={`w-14 h-7 rounded-full p-1 transition-all duration-300 flex items-center shrink-0 ${
-                      isPublic ? 'bg-indigo-600 justify-end' : 'bg-slate-100 dark:bg-slate-800 justify-start'
-                    }`}
+                    onClick={() => !isHidden && handleToggleVisibility(mod.key, isPublic)}
+                    disabled={loading || isHidden}
+                    className={`w-14 h-7 rounded-full p-1 transition-all duration-300 flex items-center shrink-0 ${isHidden ? 'bg-slate-200 dark:bg-slate-800 cursor-not-allowed justify-start' : isPublic ? 'bg-indigo-600 justify-end' : 'bg-slate-100 dark:bg-slate-800 justify-start'}`}
                   >
                     <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all"></div>
                   </button>

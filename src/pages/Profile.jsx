@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { User, Phone, MapPin, Calendar, Heart, Shield, CheckCircle, Save, Loader, AlertCircle, Laptop, Sun, Moon, Camera } from 'lucide-react'
+import { User, Phone, MapPin, Calendar, Heart, Shield, CheckCircle, Save, Loader, AlertCircle, Laptop, Sun, Moon, Camera, MessageSquare, Palette, Check } from 'lucide-react'
+import { PALETTES, applyPalette, getCurrentPaletteId } from '../lib/theme'
 
 export default function Profile() {
   const { user, profile, updateProfile } = useAuth()
@@ -15,14 +16,15 @@ export default function Profile() {
   const [comoLlego, setComoLlego] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [whatsappOptin, setWhatsappOptin] = useState(false)
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   
-  // Estado del tema
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system')
+  // Estado de la paleta
+  const [activePaletteId, setActivePaletteId] = useState(getCurrentPaletteId())
 
   // Cargar datos extendidos
   const fetchExtendedData = async () => {
@@ -82,6 +84,11 @@ export default function Profile() {
         setFechaNacimiento(profData.fecha_nacimiento || '')
         setComoLlego(profData.como_llego || '')
         setAvatarUrl(profData.avatar_url || '')
+        setWhatsappOptin(profData.whatsapp_optin || false)
+        if (profData.theme_palette) {
+          setActivePaletteId(profData.theme_palette)
+          applyPalette(profData.theme_palette, true)
+        }
       }
 
       // 3. Cargar registro espiritual
@@ -122,35 +129,17 @@ export default function Profile() {
     fetchExtendedData()
   }, [user])
 
-  // Aplicar tema
-  useEffect(() => {
-    const root = window.document.documentElement
-    
-    const applyTheme = (t) => {
-      root.classList.remove('light', 'dark')
-      
-      if (t === 'system') {
-        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-        root.classList.add(systemTheme)
-      } else {
-        root.classList.add(t)
+  const handleSelectPalette = async (paletteId) => {
+    setActivePaletteId(paletteId)
+    applyPalette(paletteId, true)
+    if (user && updateProfile) {
+      try {
+        await updateProfile({ theme_palette: paletteId })
+      } catch (err) {
+        console.error('Error al actualizar paleta:', err)
       }
     }
-
-    applyTheme(theme)
-    localStorage.setItem('theme', theme)
-    
-    // Si es del sistema, escuchar cambios del OS
-    if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-      const handleSystemThemeChange = (e) => {
-        root.classList.remove('light', 'dark')
-        root.classList.add(e.matches ? 'dark' : 'light')
-      }
-      mediaQuery.addEventListener('change', handleSystemThemeChange)
-      return () => mediaQuery.removeEventListener('change', handleSystemThemeChange)
-    }
-  }, [theme])
+  }
 
   const handleAvatarUpload = async (event) => {
     try {
@@ -163,13 +152,13 @@ export default function Profile() {
         return
       }
 
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`
+      const fileExt = file.name.split('.').pop().toLowerCase()
+      const fileName = `${user.id}.${fileExt}`
       const filePath = `${fileName}`
 
       let { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file)
+        .upload(filePath, file, { upsert: true })
 
       if (uploadError) throw uploadError
 
@@ -177,8 +166,9 @@ export default function Profile() {
         .from('avatars')
         .getPublicUrl(filePath)
 
-      setAvatarUrl(publicUrl)
-      await updateProfile({ avatar_url: publicUrl })
+      const urlWithCacheBust = `${publicUrl}?t=${Date.now()}`
+      setAvatarUrl(urlWithCacheBust)
+      await updateProfile({ avatar_url: urlWithCacheBust })
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
     } catch (error) {
@@ -369,7 +359,7 @@ export default function Profile() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 text-sm font-display"
+                  className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 text-sm font-display"
                 >
                   {saving ? (
                     <>
@@ -387,37 +377,152 @@ export default function Profile() {
             </form>
           </div>
 
-          {/* Configuración de Preferencias / Tema */}
+          {/* Configuración de Preferencias / Paleta de Colores */}
+          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white flex items-center space-x-2">
+                <Palette className="w-5 h-5 text-indigo-400" />
+                <span>Paleta de Colores y Accesibilidad</span>
+              </h3>
+            </div>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-6">
+              Selecciona el tema de color inspirado en editores de código para optimizar tu lectura y salud visual.
+            </p>
+            
+            {/* Sección Paletas Claras */}
+            <div className="space-y-3 mb-6">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-500 flex items-center space-x-1.5">
+                <Sun className="w-3.5 h-3.5" />
+                <span>Temas Claros</span>
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {PALETTES.filter(p => p.type === 'light').map((palette) => {
+                  const selected = activePaletteId === palette.id
+                  return (
+                    <button
+                      key={palette.id}
+                      onClick={() => handleSelectPalette(palette.id)}
+                      className={`flex flex-col text-left p-3.5 rounded-2xl border transition-all relative overflow-hidden active:scale-95 ${
+                        selected
+                          ? 'border-indigo-500 ring-2 ring-indigo-500/30 shadow-md'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                      style={{ backgroundColor: palette.colors.bg }}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold" style={{ color: palette.colors.text }}>
+                          {palette.name}
+                        </span>
+                        {selected && (
+                          <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                            <Check className="w-2.5 h-2.5" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] line-clamp-2 mb-3 leading-relaxed" style={{ color: palette.colors.text, opacity: 0.8 }}>
+                        {palette.description}
+                      </p>
+
+                      <div className="mt-auto flex items-center space-x-1.5 pt-1">
+                        <div className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-sm" style={{ backgroundColor: palette.colors.bg }} title="Fondo" />
+                        <div className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-sm" style={{ backgroundColor: palette.colors.card }} title="Tarjeta" />
+                        <div className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-sm" style={{ backgroundColor: palette.colors.accent }} title="Acento" />
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold ml-auto" style={{ backgroundColor: palette.colors.card, color: palette.colors.text }}>
+                          {palette.tag}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Sección Paletas Oscuras */}
+            <div className="space-y-3">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400 flex items-center space-x-1.5">
+                <Moon className="w-3.5 h-3.5" />
+                <span>Temas Oscuros</span>
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {PALETTES.filter(p => p.type === 'dark').map((palette) => {
+                  const selected = activePaletteId === palette.id
+                  return (
+                    <button
+                      key={palette.id}
+                      onClick={() => handleSelectPalette(palette.id)}
+                      className={`flex flex-col text-left p-3.5 rounded-2xl border transition-all relative overflow-hidden active:scale-95 ${
+                        selected
+                          ? 'border-indigo-500 ring-2 ring-indigo-500/30 shadow-md'
+                          : 'border-slate-800 hover:border-slate-700'
+                      }`}
+                      style={{ backgroundColor: palette.colors.bg }}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold" style={{ color: palette.colors.text }}>
+                          {palette.name}
+                        </span>
+                        {selected && (
+                          <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                            <Check className="w-2.5 h-2.5" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] line-clamp-2 mb-3 leading-relaxed" style={{ color: palette.colors.text, opacity: 0.8 }}>
+                        {palette.description}
+                      </p>
+
+                      <div className="mt-auto flex items-center space-x-1.5 pt-1">
+                        <div className="w-3.5 h-3.5 rounded-full border border-white/10 shadow-sm" style={{ backgroundColor: palette.colors.bg }} title="Fondo" />
+                        <div className="w-3.5 h-3.5 rounded-full border border-white/10 shadow-sm" style={{ backgroundColor: palette.colors.card }} title="Tarjeta" />
+                        <div className="w-3.5 h-3.5 rounded-full border border-white/10 shadow-sm" style={{ backgroundColor: palette.colors.accent }} title="Acento" />
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold ml-auto" style={{ backgroundColor: palette.colors.card, color: palette.colors.text }}>
+                          {palette.tag}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Preferencias de Notificación */}
           <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850">
             <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
-              <Laptop className="w-5 h-5 text-indigo-400" />
-              <span>Configuración de Pantalla</span>
+              <MessageSquare className="w-5 h-5 text-indigo-400" />
+              <span>Preferencias de Notificación</span>
             </h3>
-            <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Elige la apariencia visual de la aplicación según tu gusto.</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Configura cómo deseas recibir las comunicaciones de la iglesia.</p>
             
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { name: 'light', label: 'Claro', icon: Sun },
-                { name: 'dark', label: 'Oscuro', icon: Moon },
-                { name: 'system', label: 'Sistema', icon: Laptop }
-              ].map((opt) => {
-                const Icon = opt.icon
-                const selected = theme === opt.name
-                return (
-                  <button
-                    key={opt.name}
-                    onClick={() => setTheme(opt.name)}
-                    className={`flex flex-col items-center justify-center p-4 rounded-xl border text-xs font-semibold transition-all ${
-                      selected
-                        ? 'bg-indigo-600/10 text-indigo-400 border-indigo-500'
-                        : 'bg-slate-50/80 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-white dark:bg-slate-900/80 hover:text-slate-700 dark:text-slate-200'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5 mb-2" />
-                    <span>{opt.label}</span>
-                  </button>
-                )
-              })}
+            <div className="p-4 bg-slate-50/80 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">Notificaciones por WhatsApp</h4>
+                <p className="text-slate-500 text-[10px] leading-relaxed max-w-sm">
+                  Recibe avisos de nuevos devocionales, actividades y comunicados directamente a tu WhatsApp.
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  const newVal = !whatsappOptin
+                  setWhatsappOptin(newVal)
+                  try {
+                    await updateProfile({
+                      whatsapp_optin: newVal,
+                      whatsapp_optin_date: new Date().toISOString()
+                    })
+                  } catch (err) {
+                    console.error(err)
+                    setWhatsappOptin(!newVal)
+                  }
+                }}
+                className={`w-14 h-7 rounded-full p-1 transition-all duration-300 flex items-center shrink-0 ${
+                  whatsappOptin ? 'bg-emerald-500 justify-end' : 'bg-slate-200 dark:bg-slate-800 justify-start'
+                }`}
+              >
+                <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all"></div>
+              </button>
             </div>
           </div>
         </div>

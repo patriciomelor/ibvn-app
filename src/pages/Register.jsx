@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Lock, Mail, User, ShieldAlert, CheckCircle } from 'lucide-react'
+import { Lock, Mail, User, Phone, ShieldAlert, CheckCircle } from 'lucide-react'
 
 export default function Register() {
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
+  const [tel, setTel] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
@@ -29,7 +30,7 @@ export default function Register() {
     setLoading(true)
 
     try {
-      await register(email, password, nombre)
+      await register(email, password, nombre, tel)
       setSuccess(true)
       setTimeout(() => {
         navigate('/login')
@@ -109,6 +110,23 @@ export default function Register() {
 
           <div>
             <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
+              Teléfono de Contacto
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-500" />
+              <input
+                type="tel"
+                required
+                value={tel}
+                onChange={(e) => setTel(e.target.value)}
+                placeholder="+56 9 1234 5678"
+                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
               Contraseña
             </label>
             <div className="relative">
@@ -144,7 +162,7 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading || success}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-medium py-3 rounded-xl shadow-lg shadow-indigo-950/50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none text-sm font-display"
+            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-xl shadow-lg shadow-indigo-950/50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none text-sm font-display"
           >
             {loading ? 'Creando Cuenta...' : 'Registrarse'}
           </button>

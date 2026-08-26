@@ -41,6 +41,71 @@
   }
 }
 
+/* ==========================================================================
+   PALETAS DE COLORES (ESTILO EDITOR DE CÓDIGO)
+   ========================================================================== */
+
+/* 1. Sepia Lectura (Light) */
+[data-palette="light-sepia"] {
+  --text-muted: #78716c;
+  --text-secondary: #57534e;
+  --text-light: #44403c;
+}
+[data-palette="light-sepia"] body {
+  background-color: #fbf7ee !important;
+  color: #292524 !important;
+}
+[data-palette="light-sepia"] .glass {
+  background: rgba(244, 236, 216, 0.85) !important;
+  border-color: rgba(215, 204, 180, 0.6) !important;
+}
+
+/* 2. Alto Contraste Claro (Light) */
+[data-palette="light-contrast"] {
+  --text-muted: #334155;
+  --text-secondary: #1e293b;
+  --text-light: #000000;
+}
+[data-palette="light-contrast"] body {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+[data-palette="light-contrast"] .glass {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: #000000 !important;
+}
+
+/* 3. Medianoche Oceánica (Dark) */
+[data-palette="dark-ocean"] {
+  --text-muted: #94a3b8;
+  --text-secondary: #cbd5e1;
+  --text-light: #f1f5f9;
+}
+[data-palette="dark-ocean"] body {
+  background-color: #090d16 !important;
+  color: #f1f5f9 !important;
+}
+[data-palette="dark-ocean"] .glass {
+  background: rgba(17, 24, 39, 0.75) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 4. OLED Negro Puro (Dark) */
+[data-palette="dark-oled"] {
+  --text-muted: #a1a1aa;
+  --text-secondary: #d4d4d8;
+  --text-light: #ffffff;
+}
+[data-palette="dark-oled"] body {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+[data-palette="dark-oled"] .glass {
+  background: rgba(18, 18, 18, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+
 /* Estilos de scrollbar premium */
 ::-webkit-scrollbar {
   width: 6px;
@@ -118,21 +183,18 @@
   animation: fadeIn 0.3s ease-out forwards;
 }
 
-/* Estilo para impresión en PDF */
-@media print {
-  body {
-    background: white;
-    color: black;
+/* Animación slide-in para drawer móvil */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
   }
-  .no-print {
-    display: none !important;
+  to {
+    transform: translateX(0);
   }
-  .print-card {
-    border: none !important;
-    box-shadow: none !important;
-    background: transparent !important;
-    padding: 0 !important;
-  }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.25s ease-out forwards;
 }
 
 /* Ocultar barra de desplazamiento manteniendo funcionalidad */

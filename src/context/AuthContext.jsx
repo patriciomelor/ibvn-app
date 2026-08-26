@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { applyPalette } from '../lib/theme'
 
 const AuthContext = createContext({})
 
@@ -83,6 +84,7 @@ export const AuthProvider = ({ children }) => {
                   id: userId,
                   email: authUser.email,
                   nombre: authUser.user_metadata?.nombre || authUser.user_metadata?.name || 'Miembro Nuevo',
+                  tel: authUser.user_metadata?.tel || '',
                   rol: 'miembro'
                 })
                 .select('*, cargo, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
@@ -99,6 +101,9 @@ export const AuthProvider = ({ children }) => {
         setProfile(null)
       } else {
         setProfile(data)
+        if (data?.theme_palette) {
+          applyPalette(data.theme_palette, true)
+        }
       }
     } catch (err) {
       console.error(err)
@@ -233,10 +238,10 @@ export const AuthProvider = ({ children }) => {
     return data
   }
 
-  const register = async (email, password, nombre) => {
+  const register = async (email, password, nombre, tel) => {
     setLoading(true)
     const { data, error } = await supabase.auth.signUp({
-      email, password, options: { data: { nombre: nombre } }
+      email, password, options: { data: { nombre: nombre, tel: tel } }
     })
     if (error) { setLoading(false); throw error; }
     setLoading(false)
@@ -263,6 +268,9 @@ export const AuthProvider = ({ children }) => {
 
     if (error) throw error
     setProfile(data)
+    if (updates.theme_palette) {
+      applyPalette(updates.theme_palette, true)
+    }
     return data
   }
 
