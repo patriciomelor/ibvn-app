@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { BookOpen, History, User, ShieldCheck, LogOut, LogIn, Globe, Award, Activity, FileText, Download, Calendar as CalendarIcon, ArrowLeft, Menu, X, Bell } from 'lucide-react'
 import OnboardingModal from './OnboardingModal'
+import PaletteSelectorModal from './PaletteSelectorModal'
 
 // Módulos ocultos del front (backend se mantiene intacto)
 const HIDDEN_MODULES = ['misiones', 'escuela', 'deportes']
@@ -101,6 +102,7 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col md:flex-row">
       <OnboardingModal />
+      <PaletteSelectorModal />
       {/* 1. SIDEBAR (Escritorio) */}
       <aside className="hidden md:flex md:w-64 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shrink-0 sticky top-0 h-screen p-5">
         {/* Header Logo */}

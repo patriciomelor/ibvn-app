@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { applyPalette } from '../lib/theme'
 
 const AuthContext = createContext({})
 
@@ -100,6 +101,9 @@ export const AuthProvider = ({ children }) => {
         setProfile(null)
       } else {
         setProfile(data)
+        if (data?.theme_palette) {
+          applyPalette(data.theme_palette, true)
+        }
       }
     } catch (err) {
       console.error(err)
@@ -264,6 +268,9 @@ export const AuthProvider = ({ children }) => {
 
     if (error) throw error
     setProfile(data)
+    if (updates.theme_palette) {
+      applyPalette(updates.theme_palette, true)
+    }
     return data
   }
 
