@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { BookOpen, Globe, Award, ChevronRight, X } from 'lucide-react'
+import { BookOpen, FileText, MessageSquare, ChevronRight, X } from 'lucide-react'
 
 export default function OnboardingModal() {
   const [show, setShow] = useState(false)
@@ -30,21 +30,21 @@ export default function OnboardingModal() {
 
   const steps = [
     {
-      title: 'Devocional Diario',
-      desc: 'Encuentra el pasaje y comentario pastoral semanal conectado con las predicaciones. Registra tus reflexiones en los 3 bloques de tu Diario Espiritual personal.',
+      title: 'Devocional y Diario Espiritual',
+      desc: 'Encuentra el pasaje y comentario pastoral semanal conectado con las predicaciones. Registra tus reflexiones personales en tu diario privado.',
       icon: BookOpen,
       color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20'
     },
     {
-      title: 'Ministerio de Misiones',
-      desc: 'Clama y comprométete a orar por el Pueblo del Mes. Mantente al día con las cartas, pedidos de oración y reportes semanales de nuestros misioneros apoyados.',
-      icon: Globe,
+      title: 'Biblioteca de Recursos',
+      desc: 'Accede libremente a guías de estudio, manuales de apoyo doctrinal y materiales para profundizar en la palabra.',
+      icon: FileText,
       color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
     },
     {
-      title: 'Escuela de Líderes',
-      desc: 'Sigue el avance de tus cursos y clases de discipulado. Conéctate con tu mentor espiritual asignado y mantente activo en el checklist de requisitos de liderazgo.',
-      icon: Award,
+      title: 'Notificaciones por WhatsApp',
+      desc: 'Recibe los comunicados oficiales y avisos de nuevos devocionales directamente en tu WhatsApp activando el permiso en tu perfil.',
+      icon: MessageSquare,
       color: 'text-violet-400 bg-violet-500/10 border-violet-500/20'
     }
   ]

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe } from 'lucide-react'
+import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe, Send, Lock, Building, Star } from 'lucide-react'
+import { sendWhatsAppMessage, notifySubscribersAboutDevocional } from '../lib/whatsapp'
 
 export default function Admin() {
   const { user, isPastorAdmin, moduleVisibility, refreshVisibility } = useAuth()
@@ -49,6 +50,12 @@ export default function Admin() {
   // 5. Métricas y Alertas Globales
   const [unresolvedAlerts, setUnresolvedAlerts] = useState([])
 
+  // 6. Pruebas de WhatsApp (Kapso)
+  const [waTestPhone, setWaTestPhone] = useState('')
+  const [waTestMessage, setWaTestMessage] = useState('Hola, esta es una prueba de integración Kapso WhatsApp desde IBVN App 🎉')
+  const [waSending, setWaSending] = useState(false)
+  const [waTestResult, setWaTestResult] = useState(null)
+
   // --- NUEVOS ESTADOS SUPER ADMIN ---
   const [userSearchTerm, setUserSearchTerm] = useState('')
 
@@ -80,6 +87,8 @@ export default function Admin() {
   const [recursoDesc, setRecursoDesc] = useState('')
   const [recursoCategory, setRecursoCategory] = useState('Manuales')
   const [recursoFileUrl, setRecursoFileUrl] = useState('')
+  const [recursoDestacado, setRecursoDestacado] = useState(false)
+  const [recursoTargetAudience, setRecursoTargetAudience] = useState('visita')
   const [editingRecursoId, setEditingRecursoId] = useState(null)
 
   // --- NUEVOS ESTADOS MINISTERIOS CRUD ---
@@ -202,6 +211,7 @@ export default function Admin() {
     try {
       const { data, error } = await supabase
         .from('recursos')
+        .select('*')
         .order('created_at', { ascending: false })
       if (error) throw error
       setResources(data || [])
@@ -309,7 +319,9 @@ export default function Admin() {
         title: recursoTitle,
         description: recursoDesc,
         category: recursoCategory,
-        file_url: recursoFileUrl
+        file_url: recursoFileUrl,
+        destacado: recursoDestacado,
+        target_audience: recursoTargetAudience
       }
 
       if (editingRecursoId) {
@@ -331,6 +343,8 @@ export default function Admin() {
       setRecursoDesc('')
       setRecursoCategory('Manuales')
       setRecursoFileUrl('')
+      setRecursoDestacado(false)
+      setRecursoTargetAudience('visita')
       setEditingRecursoId(null)
       await fetchResourcesAdmin()
     } catch (err) {
@@ -347,6 +361,8 @@ export default function Admin() {
     setRecursoDesc(res.description)
     setRecursoCategory(res.category)
     setRecursoFileUrl(res.file_url)
+    setRecursoDestacado(res.destacado || false)
+    setRecursoTargetAudience(res.target_audience || 'visita')
   }
 
   // --- HANDLERS CHURCH SETTINGS ---
@@ -482,10 +498,10 @@ export default function Admin() {
 
       const { error } = await supabase
         .from('module_visibility')
-        .upsert({ 
-          module_key: moduleKey, 
+        .upsert({
+          module_key: moduleKey,
           label: labelMap[moduleKey] || moduleKey,
-          is_public: !currentStatus 
+          is_public: !currentStatus
         }, { onConflict: 'module_key' })
 
       if (error) throw error
@@ -604,9 +620,9 @@ export default function Admin() {
         .update({ estado: newState })
         .eq('id', postulacionId)
       if (error) throw error
-      
+
       // Update local state
-      setAdminMisionesPostulaciones(prev => 
+      setAdminMisionesPostulaciones(prev =>
         prev.map(p => p.id === postulacionId ? { ...p, estado: newState } : p)
       )
     } catch (err) {
@@ -620,7 +636,7 @@ export default function Admin() {
     if (!isPastorAdmin) return
     try {
       setLoading(true)
-      
+
       // 1. Obtener perfiles de usuarios
       const { data: profs, error: profsErr } = await supabase
         .from('profiles')
@@ -651,7 +667,7 @@ export default function Admin() {
         .select('*, profiles:user_id(nombre)')
         .eq('resuelta', false)
         .order('created_at', { ascending: false })
-      
+
       if (!alrtsErr) {
         setUnresolvedAlerts(alrts || [])
       }
@@ -679,7 +695,7 @@ export default function Admin() {
     }
     setIsGeneratingIA(true)
     setIaError('')
-    
+
     try {
       // 1. Subir a Supabase
       setIaStatus('1/2 Subiendo audio a la nube...')
@@ -702,25 +718,25 @@ export default function Admin() {
       })
 
       const result = await response.json()
-      
+
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Error al procesar el audio.')
       }
 
       const { devocional } = result
-      
+
       // 3. Rellenar formulario
       setTitulo(devocional.titulo || '')
       setTextoBiblico(`${devocional.versiculo_referencia || ''} - ${devocional.versiculo_texto || ''}`)
       setReflexion(devocional.cuerpo_texto || '')
       setOracion(devocional.frase_reflexion || '')
-      
+
       setIaStatus('¡Generación completada con éxito!')
       setTimeout(() => setIaStatus(''), 5000)
       setAudioFile(null)
       const input = document.getElementById('audio_upload_input')
       if (input) input.value = ''
-      
+
     } catch (err) {
       console.error(err)
       setIaError(err.message)
@@ -752,6 +768,12 @@ export default function Admin() {
       if (error) throw error
 
       setSuccessMessage('¡Devocional publicado con éxito en la aplicación!')
+
+      // Disparar notificaciones por WhatsApp a miembros con opt-in activo (según SDD-03)
+      notifySubscribersAboutDevocional(titulo, supabase)
+        .then(res => console.log('Notificación WhatsApp devocional enviada:', res))
+        .catch(err => console.error('Error enviando WhatsApp devocional:', err))
+
       setTitulo('')
       setTextoBiblico('')
       setReflexion('')
@@ -776,7 +798,7 @@ export default function Admin() {
 
     try {
       setLoadingSubData(true)
-      
+
       // 1. Cargar progreso de discipulado
       const { data: spData, error: spErr } = await supabase
         .from('spiritual_records')
@@ -865,10 +887,10 @@ export default function Admin() {
     try {
       setIsUploadingAdminAvatar(true)
       setErrorMessage('')
-      
+
       const file = event.target.files[0]
       if (!file) return
-      
+
       if (file.size > 2 * 1024 * 1024) {
         setErrorMessage('La imagen no puede pesar más de 2MB')
         return
@@ -899,11 +921,11 @@ export default function Admin() {
       if (updateErr) throw updateErr
 
       setSuccessMessage('Foto de perfil actualizada con éxito.')
-      
+
       // Update selectedUser locally to reflect changes
       setSelectedUser(prev => ({ ...prev, avatar_url: publicUrl }))
       await loadAdminData() // Refresh lists
-      
+
     } catch (error) {
       console.error(error)
       setErrorMessage('Error subiendo la imagen: ' + error.message)
@@ -938,7 +960,7 @@ export default function Admin() {
         .select('*, author:author_id(nombre)')
         .eq('user_id', selectedUser.id)
         .order('created_at', { ascending: false })
-      
+
       setPastoralNotes(notes || [])
     } catch (err) {
       console.error('Error adding note:', err.message)
@@ -988,7 +1010,7 @@ export default function Admin() {
         .eq('id', alertId)
 
       if (error) throw error
-      
+
       setSuccessMessage('Alerta resuelta con éxito.')
       await loadAdminData()
     } catch (err) {
@@ -1025,14 +1047,14 @@ export default function Admin() {
       new Date(p.created_at).toLocaleDateString('es-CL')
     ])
 
-    const csvContent = 
-      'data:text/csv;charset=utf-8,\uFEFF' + 
+    const csvContent =
+      'data:text/csv;charset=utf-8,\uFEFF' +
       [headers.join(','), ...rows.map(e => e.map(val => `"${val.replace(/"/g, '""')}"`).join(','))].join('\n')
-    
+
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement('a')
     link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `catastro_miembros_${new Date().toISOString().slice(0,10)}.csv`)
+    link.setAttribute('download', `catastro_miembros_${new Date().toISOString().slice(0, 10)}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -1040,10 +1062,10 @@ export default function Admin() {
 
   // Filtrar lista de perfiles
   const filteredProfiles = profiles.filter((p) => {
-    const matchesSearch = 
+    const matchesSearch =
       p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.email.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesRol = filterRol ? p.rol === filterRol : true
     const matchesCelula = filterCelula ? p.celula_id === parseInt(filterCelula) : true
     const matchesMinisterio = filterMinisterio ? p.ministerio_id === parseInt(filterMinisterio) : true
@@ -1077,7 +1099,7 @@ export default function Admin() {
           <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight">Panel de Administración</h2>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gestión pastoral integral, publicaciones y estadísticas del ministerio.</p>
         </div>
-        
+
         {/* Exportador */}
         <button
           onClick={handleExportCSV}
@@ -1088,86 +1110,48 @@ export default function Admin() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 overflow-x-auto pb-0.5">
-        <button
-          onClick={() => { setActiveTab('devocional'); setSelectedUser(null); }}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
-            activeTab === 'devocional'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>Publicar Devocional</span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('crm'); }}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
-            activeTab === 'crm'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
-          }`}
-        >
-          <UserCheck className="w-4 h-4" />
-          <span>CRM Pastoral</span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('metricas'); setSelectedUser(null); }}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
-            activeTab === 'metricas'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          <span>Métricas y Alertas ({unresolvedAlerts.length})</span>
-        </button>
-        {/* Tabs ocultos temporalmente: Misiones y Actividades */}
-        <button
-          onClick={() => { setActiveTab('recursos'); setSelectedUser(null); }}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
-            activeTab === 'recursos'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>Recursos</span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('usuarios'); setSelectedUser(null); }}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
-            activeTab === 'usuarios'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Usuarios</span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('configuracion'); setSelectedUser(null); }}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
-            activeTab === 'configuracion'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          <span>Configuraciones</span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('ministerios_crud'); setSelectedUser(null); }}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 shrink-0 ${
-            activeTab === 'ministerios_crud'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
-          }`}
-        >
-          <Award className="w-4 h-4" />
-          <span>Ministerios</span>
-        </button>
+      {/* NAVEGACIÓN PRINCIPAL DEL PANEL ADMINISTRADOR */}
+      <div className="bg-slate-100/80 dark:bg-slate-900/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
+        <div className="flex items-center justify-between px-2 pt-0.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <span>Menú de Gestión Pastoral</span>
+          <span className="hidden sm:inline text-indigo-400 font-semibold">Vida Nueva App Admin</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+          {[
+            { id: 'devocional', label: 'Devocional', icon: BookOpen },
+            { id: 'recursos', label: 'Recursos', icon: FileText },
+            { id: 'crm', label: 'CRM Pastoral', icon: UserCheck },
+            { id: 'usuarios', label: 'Usuarios', icon: Users },
+            { id: 'ministerios_crud', label: 'Ministerios', icon: Award },
+            { id: 'metricas', label: 'Métricas', icon: Activity, count: unresolvedAlerts.length },
+            { id: 'configuracion', label: 'Ajustes', icon: Settings },
+          ].map((tab) => {
+            const Icon = tab.icon
+            const active = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id)
+                  setSelectedUser(null)
+                }}
+                className={`flex items-center justify-center sm:justify-start space-x-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${active
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30 ring-2 ring-indigo-500/50 scale-[1.02]'
+                  : 'bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800'
+                  }`}
+              >
+                <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-indigo-400'}`} />
+                <span className="truncate">{tab.label}</span>
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className={`ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-black ${active ? 'bg-rose-500 text-white' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Alertas */}
@@ -1202,14 +1186,14 @@ export default function Admin() {
             <p className="text-xs text-indigo-700/70 dark:text-indigo-400/70 mb-4">
               Sube el audio del devocional y la inteligencia artificial lo transcribirá y redactará el borrador por ti.
             </p>
-            
+
             {iaError && (
               <div className="flex items-center space-x-2 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 p-3 rounded-lg text-xs mb-4">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{iaError}</span>
               </div>
             )}
-            
+
             {iaStatus && (
               <div className="flex items-center space-x-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 p-3 rounded-lg text-xs mb-4">
                 <CheckCircle className="w-4 h-4 shrink-0" />
@@ -1337,12 +1321,12 @@ export default function Admin() {
       {/* TAB 2: CRM PASTORAL */}
       {activeTab === 'crm' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* Listado y Filtros Avanzados */}
           <div className="lg:col-span-1 space-y-4">
             <div className="glass rounded-3xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
               <h3 className="text-sm font-bold font-display text-slate-900 dark:text-white">Catastro y Búsqueda</h3>
-              
+
               {/* Buscador */}
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4.5 w-4.5 text-slate-500" />
@@ -1411,9 +1395,8 @@ export default function Admin() {
                     <button
                       key={member.id}
                       onClick={() => handleSelectUserCRM(member)}
-                      className={`w-full text-left px-5 py-3.5 flex items-center justify-between gap-3 transition-colors ${
-                        selectedUser?.id === member.id ? 'bg-indigo-600/10' : 'hover:bg-white dark:bg-slate-900/20'
-                      }`}
+                      className={`w-full text-left px-5 py-3.5 flex items-center justify-between gap-3 transition-colors ${selectedUser?.id === member.id ? 'bg-indigo-600/10' : 'hover:bg-white dark:bg-slate-900/20'
+                        }`}
                     >
                       <div>
                         <p className="font-semibold text-slate-700 dark:text-slate-200 text-xs">{member.nombre}</p>
@@ -1431,7 +1414,7 @@ export default function Admin() {
           <div className="lg:col-span-2 space-y-6">
             {selectedUser ? (
               <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-6">
-                
+
                 {/* Cabecera Ficha */}
                 <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-850 pb-4">
                   <div className="flex items-center space-x-3.5">
@@ -1468,9 +1451,8 @@ export default function Admin() {
                     <button
                       key={tab.id}
                       onClick={() => setCrmTab(tab.id)}
-                      className={`pb-2 border-b-2 transition-all ${
-                        crmTab === tab.id ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
-                      }`}
+                      className={`pb-2 border-b-2 transition-all ${crmTab === tab.id ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200'
+                        }`}
                     >
                       {tab.label}
                     </button>
@@ -1604,7 +1586,7 @@ export default function Admin() {
                 {/* SUB-TAB B: DISCIPULADO Y MENTORES */}
                 {crmTab === 'discipulado' && (
                   <form onSubmit={handleUpdateMemberConfig} className="space-y-6 animate-fade-in">
-                    
+
                     {/* Asignación de Rol, Cargo y Mentor */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                       <div>
@@ -1614,6 +1596,7 @@ export default function Admin() {
                           onChange={(e) => setSelectedUser({ ...selectedUser, rol: e.target.value })}
                           className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-indigo-500 text-xs"
                         >
+                          <option value="visita">Visita / Invitado</option>
                           <option value="miembro">Miembro / Asistente</option>
                           <option value="lider">Líder de Ministerio / Célula</option>
                           <option value="pastor_admin">Pastor / Administrador</option>
@@ -1708,7 +1691,7 @@ export default function Admin() {
                 {crmTab === 'historial' && (
                   <div className="space-y-6 animate-fade-in">
                     <h5 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Línea de Tiempo de Progreso Espiritual</h5>
-                    
+
                     <div className="relative border-l border-slate-200 dark:border-slate-800 ml-3.5 pl-6 space-y-6 text-xs">
                       {/* 1. Registro */}
                       <div className="relative">
@@ -1730,7 +1713,7 @@ export default function Admin() {
                       {['conectar', 'crecer', 'intro_lid', 'dones', 'aplicadas'].map((clsKey) => {
                         const isDone = selectedUserSpiritual?.[clsKey]
                         if (!isDone) return null
-                        
+
                         const labelMap = {
                           conectar: 'Aprobó Clase 1: Conectar',
                           crecer: 'Aprobó Clase 2: Crecer',
@@ -1738,7 +1721,7 @@ export default function Admin() {
                           dones: 'Aprobó Clase 4: Descubre Dones',
                           aplicadas: 'Aprobó Clase 5: Herr. Aplicadas'
                         }
-                        
+
                         return (
                           <div key={clsKey} className="relative">
                             <div className="absolute -left-[30px] top-0.5 w-4.5 h-4.5 rounded-full bg-indigo-500 border-4 border-slate-950"></div>
@@ -1828,11 +1811,11 @@ export default function Admin() {
       {/* TAB 3: MÉTRICAS Y ALERTAS */}
       {activeTab === 'metricas' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* Alertas Pastorales Activas */}
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">Alertas Pastorales de Seguimiento Activas</h3>
-            
+
             {unresolvedAlerts.length === 0 ? (
               <div className="glass rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-850">
                 <p className="text-slate-500 text-xs italic">No hay alertas de seguimiento activas. ¡Excelente!</p>
@@ -1873,13 +1856,13 @@ export default function Admin() {
           <div className="space-y-6">
             <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-4">
               <h3 className="text-md font-bold font-display text-slate-900 dark:text-white">Métricas de la Congregación</h3>
-              
+
               <div className="space-y-3.5">
                 <div className="flex items-center justify-between p-3.5 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-850/80">
                   <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Registrados Totales</span>
                   <span className="text-sm font-bold text-slate-900 dark:text-white">{statsTotal}</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3.5 bg-white/80 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-850/80">
                   <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Miembros / Asistentes</span>
                   <span className="text-sm font-bold text-indigo-400">{statsMiembros}</span>
@@ -2066,8 +2049,8 @@ export default function Admin() {
                         ) : (
                           <div className="flex flex-wrap gap-1.5">
                             {sport.sports_registrations.map((reg) => (
-                              <span 
-                                key={reg.id} 
+                              <span
+                                key={reg.id}
                                 className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-lg font-medium"
                               >
                                 {reg.profiles?.nombre || 'Miembro'}
@@ -2138,6 +2121,19 @@ export default function Admin() {
               </div>
 
               <div>
+                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Audiencia / Nivel de Acceso</label>
+                <select
+                  value={recursoTargetAudience}
+                  onChange={(e) => setRecursoTargetAudience(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                >
+                  <option value="visita">Visitas (Cualquiera registrado)</option>
+                  <option value="miembro">Solo Miembros Activos</option>
+                  <option value="lider">Solo Líderes y Pastores</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">URL de Descarga del Archivo</label>
                 <input
                   type="url"
@@ -2145,15 +2141,29 @@ export default function Admin() {
                   value={recursoFileUrl}
                   onChange={(e) => setRecursoFileUrl(e.target.value)}
                   placeholder="https://ejemplo.com/recurso.pdf"
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-805 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs"
                 />
+              </div>
+
+              <div className="flex items-center space-x-2.5 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                <input
+                  type="checkbox"
+                  id="recursoDestacado"
+                  checked={recursoDestacado}
+                  onChange={(e) => setRecursoDestacado(e.target.checked)}
+                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 cursor-pointer"
+                />
+                <label htmlFor="recursoDestacado" className="text-xs font-semibold text-amber-300 cursor-pointer flex items-center space-x-1.5">
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <span>Destacar recurso en la biblioteca</span>
+                </label>
               </div>
 
               <div className="flex gap-2.5 pt-2">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-semibold py-2.5 rounded-xl transition-all text-xs font-display flex items-center justify-center space-x-1.5"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-all text-xs font-display flex items-center justify-center space-x-1.5"
                 >
                   <Save className="w-4 h-4" />
                   <span>{editingRecursoId ? 'Guardar Cambios' : 'Publicar Recurso'}</span>
@@ -2167,6 +2177,8 @@ export default function Admin() {
                       setRecursoDesc('')
                       setRecursoCategory('Manuales')
                       setRecursoFileUrl('')
+                      setRecursoDestacado(false)
+                      setRecursoTargetAudience('visita')
                     }}
                     className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-700/50 py-2.5 px-4 rounded-xl transition-all text-xs font-semibold"
                   >
@@ -2193,16 +2205,35 @@ export default function Admin() {
                         <span className="bg-indigo-950/20 border border-indigo-900/10 text-indigo-400 font-bold px-2 py-0.5 rounded-lg text-[9px] uppercase">
                           {res.category === 'Escuela' ? 'Escuela de Líderes' : res.category}
                         </span>
+                        {res.target_audience === 'miembro' ? (
+                          <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase">
+                            Solo Miembros
+                          </span>
+                        ) : res.target_audience === 'lider' ? (
+                          <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase">
+                            Solo Líderes
+                          </span>
+                        ) : (
+                          <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase">
+                            Para Visitas
+                          </span>
+                        )}
+                        {res.destacado && (
+                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase flex items-center space-x-1">
+                            <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                            <span>Destacado</span>
+                          </span>
+                        )}
                         <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">{res.title}</h4>
                       </div>
                       <p className="text-slate-500 dark:text-slate-400 text-[10.5px] leading-relaxed">{res.description}</p>
                       <div className="flex items-center space-x-3 text-[10px] text-slate-500">
                         <span>Descargas: {res.downloads_count}</span>
                         <span>•</span>
-                        <a 
-                          href={res.file_url} 
-                          target="_blank" 
-                          rel="noreferrer" 
+                        <a
+                          href={res.file_url}
+                          target="_blank"
+                          rel="noreferrer"
                           className="text-indigo-400 hover:underline flex items-center space-x-0.5"
                         >
                           <span>Ver archivo</span>
@@ -2244,7 +2275,7 @@ export default function Admin() {
               <Globe className="w-5 h-5 text-indigo-400" />
               <span>{editingMisionId ? 'Editar Viaje' : 'Nuevo Viaje Misionero'}</span>
             </h3>
-            
+
             <form onSubmit={handleSaveMision} className="space-y-4">
               <div className="space-y-3">
                 <div>
@@ -2302,7 +2333,7 @@ export default function Admin() {
           {/* Listado de Misiones y Postulantes */}
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">Viajes Activos e Históricos</h3>
-            
+
             {adminMisiones.length === 0 ? (
               <div className="glass rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-850">
                 <p className="text-slate-500 text-xs italic">No hay viajes misioneros publicados.</p>
@@ -2314,17 +2345,16 @@ export default function Admin() {
                     <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800/50 bg-white/50 dark:bg-slate-900/30">
                       <div>
                         <div className="flex items-center space-x-2 mb-1">
-                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${
-                            mision.estado === 'abierta' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 
-                            mision.estado === 'cerrada' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 
-                            'bg-slate-500/10 text-slate-600 border-slate-500/20'
-                          }`}>{mision.estado}</span>
+                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${mision.estado === 'abierta' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                            mision.estado === 'cerrada' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
+                              'bg-slate-500/10 text-slate-600 border-slate-500/20'
+                            }`}>{mision.estado}</span>
                           <span className="text-[10px] text-slate-500 font-semibold">{mision.destino}</span>
                         </div>
                         <h4 className="font-bold text-sm text-slate-900 dark:text-white">{mision.titulo}</h4>
                         <p className="text-xs text-slate-500 mt-1">{new Date(mision.fecha_inicio).toLocaleDateString()} al {new Date(mision.fecha_fin).toLocaleDateString()} | {mision.cupos} Cupos</p>
                       </div>
-                      
+
                       <div className="flex items-center space-x-2 shrink-0 w-full sm:w-auto">
                         <button onClick={() => {
                           if (viewingMisionId === mision.id) setViewingMisionId(null)
@@ -2349,9 +2379,9 @@ export default function Admin() {
                           <span>Lista de Postulantes ({adminMisionesPostulaciones.length})</span>
                           <span className="text-indigo-500">Misión: {mision.titulo}</span>
                         </h5>
-                        
+
                         {loading && <div className="py-4 text-center"><Loader className="w-4 h-4 animate-spin text-indigo-500 mx-auto" /></div>}
-                        
+
                         {!loading && adminMisionesPostulaciones.length === 0 ? (
                           <p className="text-xs text-slate-500 italic text-center py-4 bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">No hay postulantes aún.</p>
                         ) : (
@@ -2367,16 +2397,15 @@ export default function Admin() {
                                       <a href={`tel:${post.profiles?.tel}`} className="hover:text-indigo-500">{post.profiles?.tel || 'Sin Teléfono'}</a>
                                     </div>
                                   </div>
-                                  
+
                                   <div className="flex items-center space-x-2">
                                     <select
                                       value={post.estado}
                                       onChange={(e) => handleUpdatePostulacion(post.id, e.target.value)}
-                                      className={`text-xs font-semibold px-2 py-1 rounded-lg border focus:outline-none ${
-                                        post.estado === 'aprobado' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' :
+                                      className={`text-xs font-semibold px-2 py-1 rounded-lg border focus:outline-none ${post.estado === 'aprobado' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' :
                                         post.estado === 'rechazado' ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800' :
-                                        'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800'
-                                      }`}
+                                          'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800'
+                                        }`}
                                     >
                                       <option value="pendiente">Pendiente</option>
                                       <option value="aprobado">Aprobado</option>
@@ -2415,7 +2444,7 @@ export default function Admin() {
                 Asigna roles y privilegios a los miembros registrados en la aplicación.
               </p>
             </div>
-            
+
             {/* Buscador de usuarios */}
             <div className="relative w-full md:w-80">
               <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -2440,7 +2469,7 @@ export default function Admin() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-850/40">
-                {profiles.filter(p => 
+                {profiles.filter(p =>
                   p.nombre.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
                   p.email.toLowerCase().includes(userSearchTerm.toLowerCase())
                 ).length === 0 ? (
@@ -2450,7 +2479,7 @@ export default function Admin() {
                     </td>
                   </tr>
                 ) : (
-                  profiles.filter(p => 
+                  profiles.filter(p =>
                     p.nombre.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
                     p.email.toLowerCase().includes(userSearchTerm.toLowerCase())
                   ).map((p) => (
@@ -2466,14 +2495,16 @@ export default function Admin() {
                           value={p.rol}
                           onChange={(e) => handleUpdateUserRole(p.id, e.target.value)}
                           disabled={p.id === user.id} // Evitar auto-bloqueo
-                          className={`bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
-                            p.rol === 'pastor_admin' 
-                              ? 'text-rose-400 border-rose-500/20' 
-                              : p.rol === 'lider' 
-                              ? 'text-indigo-400 border-indigo-500/20' 
-                              : 'text-slate-350'
-                          }`}
+                          className={`bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${p.rol === 'pastor_admin'
+                            ? 'text-rose-400 border-rose-500/20'
+                            : p.rol === 'lider'
+                              ? 'text-indigo-400 border-indigo-500/20'
+                              : p.rol === 'miembro'
+                                ? 'text-blue-400 border-blue-500/20'
+                                : 'text-emerald-400 border-emerald-500/20'
+                            }`}
                         >
+                          <option value="visita">Visita</option>
                           <option value="miembro">Miembro</option>
                           <option value="lider">Líder</option>
                           <option value="pastor_admin">Pastor / Administrador</option>
@@ -2493,63 +2524,173 @@ export default function Admin() {
 
       {/* TAB 7: CONFIGURACIONES */}
       {activeTab === 'configuracion' && (
-        <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-6">
-          <div>
-            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white">Configuración de Visibilidad de Módulos</h3>
-            <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-              Decide qué módulos se pueden navegar públicamente (sin iniciar sesión) y cuáles requieren obligatoriamente de un inicio de sesión.
-            </p>
+        <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-8">
+
+          {/* Bloque 1: Privacidad y Visibilidad */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white flex items-center space-x-2">
+                <Globe className="w-5 h-5 text-indigo-400" />
+                <span>Privacidad y Visibilidad de Secciones</span>
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+                Define quién puede acceder a cada sección activa de la aplicación: libre para visitantes o exclusivo para miembros registrados.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { key: 'devocional', label: 'Devocional Diario', desc: 'Permite leer el texto y reflexión diaria a visitantes sin iniciar sesión. El diario personal seguirá requiriendo login.' },
+                { key: 'archive', label: 'Historial de Devocionales', desc: 'Permite consultar predicas y reflexiones de semanas anteriores a cualquier visitante.' },
+                { key: 'recursos', label: 'Biblioteca de Recursos', desc: 'Permite descargar manuales de apoyo doctrinal y kits de estudio libremente.' },
+                { key: 'calendario', label: 'Calendario Oficial', desc: 'Permite visualizar el calendario de eventos y actividades sin iniciar sesión.' },
+              ].map((mod) => {
+                const isPublic = moduleVisibility && moduleVisibility[mod.key] === true
+                return (
+                  <div key={mod.key} className="p-4 sm:p-5 bg-slate-50/80 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all hover:border-slate-300 dark:hover:border-slate-700">
+                    <div className="space-y-1 max-w-lg">
+                      <div className="flex items-center space-x-2">
+                        <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200">{mod.label}</h4>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1 ${isPublic ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
+                          {isPublic ? <Globe className="w-3 h-3 text-emerald-400" /> : <Lock className="w-3 h-3 text-slate-400" />}
+                          <span>{isPublic ? 'Acceso Libre' : 'Solo Miembros'}</span>
+                        </span>
+                      </div>
+                      <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed">{mod.desc}</p>
+                    </div>
+
+                    {/* Control Segmentado Explícito (Público vs Privado) */}
+                    <div className="flex items-center bg-slate-200/70 dark:bg-slate-950 p-1 rounded-xl shrink-0 self-end sm:self-center border border-slate-300/40 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => !isPublic && handleToggleVisibility(mod.key, false)}
+                        disabled={loading}
+                        className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isPublic
+                          ? 'bg-emerald-600 text-white shadow-md'
+                          : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'
+                          }`}
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                        <span>Público</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => isPublic && handleToggleVisibility(mod.key, true)}
+                        disabled={loading}
+                        className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${!isPublic
+                          ? 'bg-slate-700 dark:bg-slate-800 text-white shadow-md'
+                          : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'
+                          }`}
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Solo Miembros</span>
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[
-              { key: 'devocional', label: 'Devocional Diario', desc: 'Permite leer el devocional diario a invitados. El diario espiritual seguirá requiriendo login.' },
-              { key: 'archive', label: 'Historial de Devocionales', desc: 'Permite ver devocionales de semanas anteriores.' },
-              { key: 'misiones', label: 'Misiones y Campo', desc: 'Permite visualizar pueblos y reportes de misioneros. Comprometerse a orar seguirá requiriendo login.' },
-              { key: 'escuela', label: 'Escuela de Líderes', desc: 'Permite visualizar los temas y lecciones de la Escuela. El avance personal seguirá requiriendo login.' },
-              { key: 'deportes', label: 'Actividades', desc: 'Permite ver las próximas actividades y salidas. Inscribirse y ver participantes requerirá login.' },
-              { key: 'recursos', label: 'Biblioteca de Recursos', desc: 'Permite descargar manuales de apoyo doctrinal y el Kit Replicable a cualquier visitante.' },
-              { key: 'calendario', label: 'Calendario Oficial', desc: 'Permite visualizar el calendario de actividades a invitados sin iniciar sesión.' },
-            ].map((mod) => {
-              const isPublic = moduleVisibility && moduleVisibility[mod.key] === true
-              const isHidden = ['misiones', 'escuela', 'deportes'].includes(mod.key)
-              return (
-                <div key={mod.key} className={`p-5 rounded-2xl border flex items-center justify-between gap-6 transition-all ${isHidden ? 'bg-slate-100/50 dark:bg-slate-950/40 border-slate-200/50 dark:border-slate-900 opacity-60' : 'bg-slate-50/80 dark:bg-slate-900/40 border-slate-200 dark:border-slate-850 hover:border-slate-200 dark:border-slate-800'}`}>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">{mod.label}</h4>
-                      {isHidden && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-md">Módulo Oculto</span>
-                      )}
-                    </div>
-                    <p className="text-slate-500 text-[10px] leading-relaxed max-w-sm">{mod.desc}</p>
-                  </div>
-                  
-                  {/* Toggle Button */}
-                  <button
-                    onClick={() => !isHidden && handleToggleVisibility(mod.key, isPublic)}
-                    disabled={loading || isHidden}
-                    className={`w-14 h-7 rounded-full p-1 transition-all duration-300 flex items-center shrink-0 ${isHidden ? 'bg-slate-200 dark:bg-slate-800 cursor-not-allowed justify-start' : isPublic ? 'bg-indigo-600 justify-end' : 'bg-slate-100 dark:bg-slate-800 justify-start'}`}
-                  >
-                    <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all"></div>
-                  </button>
+          {/* Pruebas de Mensajería WhatsApp (Kapso) */}
+          <div className="pt-8 border-t border-slate-200 dark:border-slate-800 space-y-4">
+            <div>
+              <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white flex items-center space-x-2">
+                <MessageSquare className="w-5 h-5 text-emerald-500" />
+                <span>Pruebas de Mensajería WhatsApp (Kapso)</span>
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+                Prueba manualmente la conexión con Kapso enviando un mensaje directo a un teléfono de prueba antes de notificar a la congregación.
+              </p>
+            </div>
+
+            <div className="p-5 bg-slate-50/80 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-850 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Teléfono de Prueba (con código de país)</label>
+                  <input
+                    type="tel"
+                    placeholder="+56 9 1234 5678"
+                    value={waTestPhone}
+                    onChange={(e) => setWaTestPhone(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200"
+                  />
                 </div>
-              )
-            })}
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Mensaje de Prueba</label>
+                  <input
+                    type="text"
+                    value={waTestMessage}
+                    onChange={(e) => setWaTestMessage(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200"
+                  />
+                </div>
+              </div>
+
+              {waTestResult && (
+                <div className={`p-4 rounded-xl text-xs space-y-1 ${waTestResult.success ? 'glass-emerald text-emerald-300' : 'glass-rose text-rose-300'}`}>
+                  <p className="font-bold flex items-center space-x-1.5">
+                    {waTestResult.success ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-rose-400" />}
+                    <span>{waTestResult.success ? '¡Mensaje enviado con éxito por Kapso!' : 'Ocurrió un problema enviando por Kapso'}</span>
+                  </p>
+                  {waTestResult.error && <p className="text-[11px] opacity-90">{String(waTestResult.error)}</p>}
+                  {waTestResult.detalles && (
+                    <pre className="text-[10px] bg-black/30 p-2 rounded max-h-32 overflow-y-auto mt-2 hide-scrollbar">
+                      {JSON.stringify(waTestResult.detalles, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                disabled={waSending || !waTestPhone.trim()}
+                onClick={async () => {
+                  setWaSending(true)
+                  setWaTestResult(null)
+                  try {
+                    const res = await sendWhatsAppMessage({ to: waTestPhone, message: waTestMessage })
+                    setWaTestResult(res)
+                  } catch (err) {
+                    setWaTestResult({ success: false, error: err.message || String(err) })
+                  } finally {
+                    setWaSending(false)
+                  }
+                }}
+                className="flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 px-5 rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50"
+              >
+                {waSending ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    <span>Conectando con Kapso...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Enviar WhatsApp de Prueba</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-          
+
           {/* Ajustes Globales de la App */}
-          <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
-            <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white">Ajustes Globales de la App</h3>
-            <p className="text-slate-500 dark:text-slate-400 text-xs mt-1 mb-6">
-              Personaliza el nombre de la iglesia, logo, redes sociales y calendario para todos los usuarios.
-            </p>
-            
+          <div className="pt-8 border-t border-slate-200 dark:border-slate-800 space-y-4">
+            <div>
+              <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white flex items-center space-x-2">
+                <Building className="w-5 h-5 text-indigo-400" />
+                <span>Información e Identidad de la Iglesia</span>
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+                Personaliza el nombre de la iglesia, logo, redes sociales y calendario para todos los usuarios.
+              </p>
+            </div>
+
             <form onSubmit={handleSaveChurchSettings} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Nombre de la Iglesia</label>
-                  <input type="text" value={settingsForm.name || ''} onChange={e => setSettingsForm({...settingsForm, name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" required />
+                  <input type="text" value={settingsForm.name || ''} onChange={e => setSettingsForm({ ...settingsForm, name: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" required />
                 </div>
                 <div className="md:col-span-2 flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-500/5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 mb-2">
                   <div className="relative w-20 h-20 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
@@ -2598,41 +2739,41 @@ export default function Admin() {
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL del Logo (Opcional - obtenido al subir imagen)</label>
-                  <input type="url" value={settingsForm.logo_url || ''} onChange={e => setSettingsForm({...settingsForm, logo_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://..." />
+                  <input type="url" value={settingsForm.logo_url || ''} onChange={e => setSettingsForm({ ...settingsForm, logo_url: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://..." />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Dirección Principal</label>
-                  <input type="text" value={settingsForm.address || ''} onChange={e => setSettingsForm({...settingsForm, address: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="text" value={settingsForm.address || ''} onChange={e => setSettingsForm({ ...settingsForm, address: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">URL Calendario Público (Ej. Google Calendar HTML)</label>
-                  <input type="url" value={settingsForm.calendar_url || ''} onChange={e => setSettingsForm({...settingsForm, calendar_url: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://calendar.google.com/calendar/embed?src=..." />
+                  <input type="url" value={settingsForm.calendar_url || ''} onChange={e => setSettingsForm({ ...settingsForm, calendar_url: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" placeholder="https://calendar.google.com/calendar/embed?src=..." />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Teléfono Público</label>
-                  <input type="text" value={settingsForm.phone || ''} onChange={e => setSettingsForm({...settingsForm, phone: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="text" value={settingsForm.phone || ''} onChange={e => setSettingsForm({ ...settingsForm, phone: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Email Público</label>
-                  <input type="email" value={settingsForm.email || ''} onChange={e => setSettingsForm({...settingsForm, email: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="email" value={settingsForm.email || ''} onChange={e => setSettingsForm({ ...settingsForm, email: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Nombre Mayordomo / Pastor General</label>
-                  <input type="text" value={settingsForm.mayordomo_name || ''} onChange={e => setSettingsForm({...settingsForm, mayordomo_name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="text" value={settingsForm.mayordomo_name || ''} onChange={e => setSettingsForm({ ...settingsForm, mayordomo_name: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 dark:border-slate-800 pt-4">
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Facebook URL</label>
-                  <input type="url" value={settingsForm.social_facebook || ''} onChange={e => setSettingsForm({...settingsForm, social_facebook: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="url" value={settingsForm.social_facebook || ''} onChange={e => setSettingsForm({ ...settingsForm, social_facebook: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Instagram URL</label>
-                  <input type="url" value={settingsForm.social_instagram || ''} onChange={e => setSettingsForm({...settingsForm, social_instagram: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="url" value={settingsForm.social_instagram || ''} onChange={e => setSettingsForm({ ...settingsForm, social_instagram: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">YouTube URL</label>
-                  <input type="url" value={settingsForm.social_youtube || ''} onChange={e => setSettingsForm({...settingsForm, social_youtube: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
+                  <input type="url" value={settingsForm.social_youtube || ''} onChange={e => setSettingsForm({ ...settingsForm, social_youtube: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" />
                 </div>
               </div>
               <div className="flex justify-end pt-4">
@@ -2655,7 +2796,7 @@ export default function Admin() {
               <Award className="w-5 h-5 text-indigo-400" />
               <span>{editingMinId ? 'Editar Ministerio' : 'Nuevo Ministerio'}</span>
             </h3>
-            
+
             <form onSubmit={handleSaveMinisterio} className="space-y-4">
               <div>
                 <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Nombre</label>
@@ -2674,7 +2815,7 @@ export default function Admin() {
                   ))}
                 </select>
               </div>
-              
+
               <div className="flex gap-2 pt-2">
                 {editingMinId && (
                   <button type="button" onClick={() => { setEditingMinId(null); setMinNombre(''); setMinDesc(''); setMinLiderId(''); }} className="w-1/3 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium py-2 rounded-xl text-xs">
@@ -2692,7 +2833,7 @@ export default function Admin() {
           {/* Listado de Ministerios */}
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">Ministerios Actuales</h3>
-            
+
             {ministerios.length === 0 ? (
               <div className="glass rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-850">
                 <p className="text-slate-500 text-xs italic">No hay ministerios registrados.</p>
