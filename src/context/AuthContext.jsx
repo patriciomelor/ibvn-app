@@ -100,6 +100,18 @@ export const AuthProvider = ({ children }) => {
         }
         setProfile(null)
       } else {
+        // Auto-healing: Si el perfil existe pero no tenía teléfono guardado y auth.user tiene tel
+        if ((!data.tel || data.tel.trim() === '') && userId) {
+          try {
+            const { data: { user: authUser } } = await supabase.auth.getUser()
+            const metaTel = authUser?.user_metadata?.tel
+            if (metaTel && metaTel.trim() !== '') {
+              await supabase.from('profiles').update({ tel: metaTel }).eq('id', userId)
+              data.tel = metaTel
+            }
+          } catch (healErr) { }
+        }
+
         setProfile(data)
         if (data?.theme_palette) {
           applyPalette(data.theme_palette, true)

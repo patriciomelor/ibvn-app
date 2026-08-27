@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Lock, Mail, User, Phone, ShieldAlert, CheckCircle } from 'lucide-react'
+import { Lock, Mail, User, Phone, ShieldAlert, CheckCircle, Eye, EyeOff, Check } from 'lucide-react'
 
 export default function Register() {
   const [nombre, setNombre] = useState('')
@@ -9,32 +9,39 @@ export default function Register() {
   const [tel, setTel] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const { register, churchSettings } = useAuth()
   const navigate = useNavigate()
 
+  // Requisitos reactivos de contraseña
+  const hasMinLength = password.length >= 6
+  const hasNumber = /\d/.test(password)
+  const passwordsMatch = Boolean(confirmPassword && password === confirmPassword)
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    if (!hasMinLength) {
+      return setError('La contraseña debe tener al menos 6 caracteres.')
+    }
 
     if (password !== confirmPassword) {
       return setError('Las contraseñas no coinciden.')
     }
 
-    if (password.length < 6) {
-      return setError('La contraseña debe tener al menos 6 caracteres.')
-    }
-
     setLoading(true)
 
     try {
-      await register(email, password, nombre, tel)
+      await register({ email, password, nombre, tel })
       setSuccess(true)
       setTimeout(() => {
         navigate('/login')
-      }, 5000)
+      }, 4000)
     } catch (err) {
       console.error(err)
       setError(err.message || 'Ocurrió un error al registrar el usuario.')
@@ -60,7 +67,7 @@ export default function Register() {
         {success && (
           <div className="glass-emerald flex items-start space-x-2 p-4 rounded-xl text-emerald-300 text-sm mb-6 animate-fade-in">
             <CheckCircle className="w-5 h-5 shrink-0 text-emerald-400" />
-            <span>¡Registro exitoso! Por favor, revisa tu bandeja de entrada o carpeta de spam para verificar tu correo antes de iniciar sesión.</span>
+            <span>¡Registro exitoso! Redirigiendo al inicio de sesión...</span>
           </div>
         )}
 
@@ -76,7 +83,7 @@ export default function Register() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
-              Nombre Completo
+              Nombre Completo *
             </label>
             <div className="relative">
               <User className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-500" />
@@ -93,7 +100,7 @@ export default function Register() {
 
           <div>
             <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
-              Correo Electrónico
+              Correo Electrónico *
             </label>
             <div className="relative">
               <Mail className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-500" />
@@ -110,7 +117,7 @@ export default function Register() {
 
           <div>
             <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
-              Teléfono de Contacto
+              Teléfono de Contacto *
             </label>
             <div className="relative">
               <Phone className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-500" />
@@ -127,37 +134,72 @@ export default function Register() {
 
           <div>
             <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
-              Contraseña
+              Contraseña *
             </label>
             <div className="relative">
               <Lock className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-500" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
-                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                placeholder="Ingresa tu contraseña"
+                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-11 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
+                title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
           </div>
 
           <div>
             <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
-              Confirmar Contraseña
+              Confirmar Contraseña *
             </label>
             <div className="relative">
               <Lock className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-500" />
               <input
-                type="password"
+                type={showConfirmPassword ? 'text' : 'password'}
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repite tu contraseña"
-                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-4 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-700/50 rounded-xl py-3 pl-11 pr-11 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3.5 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
+                title={showConfirmPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+              >
+                {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
           </div>
+
+          {/* Requisitos Reactivos de Contraseña */}
+          {password.length > 0 && (
+            <div className="p-3 bg-slate-900/40 rounded-xl border border-slate-800 space-y-1.5 animate-fade-in">
+              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Requisitos de contraseña:</p>
+              <div className="flex items-center space-x-2 text-xs">
+                <Check className={`w-3.5 h-3.5 ${hasMinLength ? 'text-emerald-400 font-bold' : 'text-slate-600'}`} />
+                <span className={hasMinLength ? 'text-emerald-400 font-semibold' : 'text-slate-500'}>Mínimo 6 caracteres</span>
+              </div>
+              <div className="flex items-center space-x-2 text-xs">
+                <Check className={`w-3.5 h-3.5 ${hasNumber ? 'text-emerald-400 font-bold' : 'text-slate-600'}`} />
+                <span className={hasNumber ? 'text-emerald-400 font-semibold' : 'text-slate-500'}>Incluye al menos un número (0-9)</span>
+              </div>
+              <div className="flex items-center space-x-2 text-xs">
+                <Check className={`w-3.5 h-3.5 ${passwordsMatch ? 'text-emerald-400 font-bold' : 'text-slate-600'}`} />
+                <span className={passwordsMatch ? 'text-emerald-400 font-semibold' : 'text-slate-500'}>Las contraseñas coinciden</span>
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"
