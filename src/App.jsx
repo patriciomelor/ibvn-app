@@ -15,6 +15,8 @@ import Recursos from './pages/Recursos'
 import Calendario from './pages/Calendario'
 import Notificaciones from './pages/Notificaciones'
 
+const HIDDEN_MODULES = ['misiones', 'escuela', 'deportes']
+
 function ProtectedRoute({ children, moduleKey, adminOnly = false }) {
   const { user, loading, isPastorAdmin, moduleVisibility } = useAuth()
 
@@ -25,6 +27,11 @@ function ProtectedRoute({ children, moduleKey, adminOnly = false }) {
         <p className="text-slate-500 dark:text-slate-400 text-sm">Verificando sesión...</p>
       </div>
     )
+  }
+
+  // Redirigir a inicio si se intenta acceder por URL a un módulo oculto del front
+  if (HIDDEN_MODULES.includes(moduleKey)) {
+    return <Navigate to="/" replace />
   }
 
   // Si requiere administrador
@@ -44,7 +51,8 @@ function ProtectedRoute({ children, moduleKey, adminOnly = false }) {
 
     // Si es la página de inicio (devocional) y es privada, intentar redirigir al primer módulo público disponible
     if (moduleKey === 'devocional') {
-      const publicKeys = Object.keys(moduleVisibility || {}).filter(k => moduleVisibility[k] === true)
+      const publicKeys = Object.keys(moduleVisibility || {})
+        .filter(k => moduleVisibility[k] === true && !HIDDEN_MODULES.includes(k))
       if (publicKeys.length > 0) {
         const firstPublic = publicKeys[0]
         const targetPath = firstPublic === 'devocional' ? '/' : `/${firstPublic}`

@@ -85,7 +85,7 @@ export const AuthProvider = ({ children }) => {
                   email: authUser.email,
                   nombre: authUser.user_metadata?.nombre || authUser.user_metadata?.name || 'Miembro Nuevo',
                   tel: authUser.user_metadata?.tel || '',
-                  rol: 'miembro'
+                  rol: 'visita'
                 })
                 .select('*, cargo, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
                 .single()
@@ -129,49 +129,6 @@ export const AuthProvider = ({ children }) => {
 
     const appleIcon = document.querySelector('link[rel="apple-touch-icon"]')
     if (appleIcon) appleIcon.setAttribute('href', iconUrl)
-
-    // 3. Dynamic PWA Manifest
-    let manifestLink = document.querySelector('link[rel="manifest"]')
-    if (!manifestLink) {
-      manifestLink = document.createElement('link')
-      manifestLink.setAttribute('rel', 'manifest')
-      document.head.appendChild(manifestLink)
-    }
-
-    const dynamicManifest = {
-      name: `${settings.name || 'Vida Nueva'} App`,
-      short_name: settings.name || 'Vida Nueva',
-      description: `Aplicación ministerial oficial de ${settings.name || 'Vida Nueva'}.`,
-      theme_color: '#1e293b',
-      background_color: '#0f172a',
-      display: 'standalone',
-      orientation: 'portrait',
-      scope: '/',
-      start_url: '/',
-      icons: [
-        {
-          src: iconUrl,
-          sizes: '192x192',
-          type: 'image/png'
-        },
-        {
-          src: iconUrl,
-          sizes: '512x512',
-          type: 'image/png'
-        },
-        {
-          src: iconUrl,
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'any maskable'
-        }
-      ]
-    }
-
-    const stringManifest = JSON.stringify(dynamicManifest)
-    const blob = new Blob([stringManifest], { type: 'application/json' })
-    const manifestURL = URL.createObjectURL(blob)
-    manifestLink.setAttribute('href', manifestURL)
   }
 
   useEffect(() => {
@@ -231,30 +188,33 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  const login = async (email, password) => {
-    setLoading(true)
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setLoading(false); throw error; }
+  const register = async ({ email, password, nombre, tel }) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          nombre,
+          tel,
+          rol: 'visita'
+        }
+      }
+    })
+    if (error) throw error
     return data
   }
 
-  const register = async (email, password, nombre, tel) => {
-    setLoading(true)
-    const { data, error } = await supabase.auth.signUp({
-      email, password, options: { data: { nombre: nombre, tel: tel } }
-    })
-    if (error) { setLoading(false); throw error; }
-    setLoading(false)
+  const login = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
     return data
   }
 
   const logout = async () => {
-    setLoading(true)
     const { error } = await supabase.auth.signOut()
+    if (error) throw error
     setUser(null)
     setProfile(null)
-    setLoading(false)
-    if (error) throw error
   }
 
   const updateProfileData = async (updates) => {
@@ -268,9 +228,6 @@ export const AuthProvider = ({ children }) => {
 
     if (error) throw error
     setProfile(data)
-    if (updates.theme_palette) {
-      applyPalette(updates.theme_palette, true)
-    }
     return data
   }
 
@@ -282,9 +239,11 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateProfile: updateProfileData,
-    rol: profile?.rol || (user ? 'miembro' : 'invitado'),
+    rol: profile?.rol || (user ? 'visita' : 'invitado'),
     isPastorAdmin: profile?.rol === 'pastor_admin',
     isLider: profile?.rol === 'lider' || profile?.rol === 'pastor_admin',
+    isMiembro: profile?.rol === 'miembro' || profile?.rol === 'lider' || profile?.rol === 'pastor_admin',
+    isVisita: profile?.rol === 'visita' || !profile?.rol,
     moduleVisibility,
     refreshVisibility: fetchVisibility,
     churchSettings,

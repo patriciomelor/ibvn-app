@@ -11,16 +11,19 @@ import {
   Loader, 
   AlertCircle,
   HelpCircle,
-  ExternalLink
+  ExternalLink,
+  Star,
+  ChevronDown
 } from 'lucide-react'
 
 export default function Recursos() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('Todos')
   const [errorMessage, setErrorMessage] = useState('')
+  const [openAccordionId, setOpenAccordionId] = useState(null)
 
   // Cargar biblioteca de recursos
   const fetchResources = async () => {
@@ -50,28 +53,35 @@ export default function Recursos() {
   // Manejar descarga y actualizar contador
   const handleDownload = async (resource) => {
     try {
-      // Incrementar el contador usando la función RPC segura en Supabase
       const { error } = await supabase
         .rpc('increment_recurso_downloads', { recurso_id: resource.id })
 
       if (error) throw error
-
-      // Abrir enlace en pestaña nueva
       window.open(resource.file_url, '_blank')
       
-      // Actualizar el estado local para reflejar la descarga de forma rápida
       setResources(prev => 
-        prev.map(r => r.id === resource.id ? { ...r, downloads_count: r.downloads_count + 1 } : r)
+        prev.map(r => r.id === resource.id ? { ...r, downloads_count: (r.downloads_count || 0) + 1 } : r)
       )
     } catch (err) {
       console.error('Error tracking download:', err.message)
-      // Fallback: abrir enlace de todos modos
       window.open(resource.file_url, '_blank')
     }
   }
 
-  // Filtrar recursos
-  const filteredResources = resources.filter(res => {
+  // Comprobar si el usuario tiene permiso para ver el recurso según su rol
+  const canAccessResource = (resource) => {
+    const userRole = profile?.rol || 'visita'
+    const audience = resource.target_audience || 'visita'
+    if (userRole === 'pastor_admin' || userRole === 'lider') return true
+    if (userRole === 'miembro') return audience === 'visita' || audience === 'miembro'
+    return audience === 'visita'
+  }
+
+  // Filtrar recursos por permisos de jerarquía de rol
+  const accessibleResources = resources.filter(canAccessResource)
+
+  // Filtrar recursos por búsqueda y categoría
+  const filteredResources = accessibleResources.filter(res => {
     const matchesSearch = 
       res.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
       res.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -82,6 +92,9 @@ export default function Recursos() {
 
     return matchesSearch && matchesCategory
   })
+
+  // Recursos marcados como destacados accesibles para este usuario
+  const featuredResources = accessibleResources.filter(r => r.destacado === true)
 
   // Obtener categorías únicas
   const categories = ['Todos', 'Manuales', 'Escuela', 'Kit Replicable']
@@ -94,9 +107,6 @@ export default function Recursos() {
       </div>
     )
   }
-
-  // Buscar el recurso específico de kit replicable para destacarlo
-  const replicationKit = resources.find(r => r.category === 'Kit Replicable')
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -119,48 +129,151 @@ export default function Recursos() {
         </div>
       )}
 
-      {/* Sección Destacada del Kit Replicable */}
-      <div className="glass-indigo rounded-3xl p-6 md:p-8 border border-indigo-500/20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
-          <div className="lg:col-span-2 space-y-4">
-            <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-block">
-              Proyecto Abierto (Open Source)
-            </span>
-            <h3 className="text-xl sm:text-2xl font-bold font-display text-slate-900 dark:text-white leading-tight">
-              Kit Replicable de Vida Nueva App
-            </h3>
-            <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed max-w-2xl text-justify">
-              ¿Quieres implementar este sistema en tu congregación? El **Kit Replicable** contiene los manuales técnicos, plantillas de base de datos y guías de configuración para desplegar Vida Nueva App en React, Supabase y Vercel de manera totalmente autónoma.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row lg:flex-col justify-center gap-3">
-            {replicationKit ? (
-              <button
-                onClick={() => handleDownload(replicationKit)}
-                className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-slate-900 dark:text-white font-semibold py-3.5 px-6 rounded-xl transition-all active:scale-[0.98] text-xs font-display shadow-lg shadow-indigo-950/50"
-              >
-                <Download className="w-4 h-4" />
-                <span>Descargar Setup Guide</span>
-              </button>
-            ) : (
-              <div className="text-slate-500 text-center text-xs border border-dashed border-slate-200 dark:border-slate-800 p-4 rounded-xl">
-                Manual del Kit temporalmente fuera de línea.
+      {/* SECCIÓN DE RECURSOS DESTACADOS (ADAPTATIVA) */}
+      
+      {/* CASO 1: 1 SOLO RECURSO DESTACADO -> Formato de Tarjeta Destacada Única */}
+      {featuredResources.length === 1 && (() => {
+        const item = featuredResources[0]
+        return (
+          <div className="glass-indigo rounded-3xl p-6 md:p-8 border border-indigo-500/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+              <div className="lg:col-span-2 space-y-3">
+                <div className="flex items-center space-x-2">
+                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center space-x-1">
+                    <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                    <span>Recurso Destacado</span>
+                  </span>
+                  <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    {item.category === 'Escuela' ? 'Escuela de Líderes' : item.category}
+                  </span>
+                </div>
+
+                <h3 className="text-xl sm:text-2xl font-bold font-display text-slate-900 dark:text-white leading-tight">
+                  {item.title}
+                </h3>
+                <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed max-w-2xl">
+                  {item.description}
+                </p>
               </div>
-            )}
-            <a
-              href="https://github.com/patriciomelor/ibvn-app"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:bg-slate-800 text-indigo-400 border border-slate-200 dark:border-slate-800 py-3.5 px-6 rounded-xl transition-all text-xs font-semibold font-display"
-            >
-              <Cpu className="w-4 h-4" />
-              <span>Ver Código en GitHub</span>
-              <ExternalLink className="w-3 h-3 text-slate-500" />
-            </a>
+
+              <div className="flex flex-col sm:flex-row lg:flex-col justify-center gap-3">
+                {item.file_url && (
+                  <button
+                    onClick={() => handleDownload(item)}
+                    className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3.5 px-6 rounded-xl transition-all active:scale-[0.98] text-xs font-display shadow-lg shadow-indigo-950/50"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Descargar Archivo</span>
+                  </button>
+                )}
+                {item.external_url && (
+                  <a
+                    href={item.external_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-400 border border-slate-200 dark:border-slate-800 py-3.5 px-6 rounded-xl transition-all text-xs font-semibold font-display"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Abrir Enlace</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* CASO 2: MÁS DE 1 RECURSO DESTACADO -> Formato de Lista en Acordeón Desplegable */}
+      {featuredResources.length > 1 && (
+        <div className="glass-indigo rounded-3xl p-6 md:p-8 border border-indigo-500/20 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+              <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white">
+                Recursos Destacados ({featuredResources.length})
+              </h3>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300 bg-indigo-500/20 px-2.5 py-1 rounded-full border border-indigo-500/30">
+              Recomendación Pastoral
+            </span>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            {featuredResources.map((item, index) => {
+              const isOpen = openAccordionId === item.id || (openAccordionId === null && index === 0)
+              return (
+                <div 
+                  key={item.id} 
+                  className="bg-white/80 dark:bg-slate-900/80 rounded-2xl border border-indigo-500/20 overflow-hidden transition-all shadow-sm"
+                >
+                  {/* Encabezado del Acordeón */}
+                  <button
+                    type="button"
+                    onClick={() => setOpenAccordionId(isOpen ? 'none' : item.id)}
+                    className="w-full p-4 flex items-center justify-between text-left hover:bg-indigo-500/5 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3 pr-4">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                        <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                            {item.category === 'Escuela' ? 'Escuela de Líderes' : item.category}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
+                          {item.title}
+                        </h4>
+                      </div>
+                    </div>
+
+                    <ChevronDown className={`w-5 h-5 text-indigo-400 transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Contenido Desplegable */}
+                  {isOpen && (
+                    <div className="px-5 pb-5 pt-2 border-t border-slate-100 dark:border-slate-800/60 space-y-4 animate-fade-in">
+                      <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed">
+                        {item.description}
+                      </p>
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                        <span className="text-[10px] text-slate-500 font-semibold">
+                          Descargas: {item.downloads_count || 0}
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {item.file_url && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownload(item)}
+                              className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-xl text-xs transition-all active:scale-95 shadow-md shadow-indigo-950/30"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Descargar Archivo</span>
+                            </button>
+                          )}
+                          {item.external_url && (
+                            <a
+                              href={item.external_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-400 border border-slate-200 dark:border-slate-800 py-2 px-4 rounded-xl text-xs font-semibold transition-all"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span>Abrir Enlace</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Controles de Filtro y Buscador */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/80 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-850">
@@ -203,7 +316,6 @@ export default function Recursos() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredResources.map((res) => {
-            // Icono según categoría
             const getCategoryIcon = (cat) => {
               switch (cat) {
                 case 'Manuales':
@@ -245,14 +357,29 @@ export default function Recursos() {
                   </p>
                 </div>
 
-                {/* Botón Descarga */}
-                <button
-                  onClick={() => handleDownload(res)}
-                  className="w-full flex items-center justify-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 text-indigo-400 py-2.5 rounded-xl text-xs font-semibold mt-4 transition-all active:scale-[0.98]"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Descargar Recurso</span>
-                </button>
+                {/* Botones de Acción */}
+                <div className="flex flex-col gap-2 mt-4">
+                  {res.file_url && (
+                    <button
+                      onClick={() => handleDownload(res)}
+                      className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.98]"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Descargar Archivo</span>
+                    </button>
+                  )}
+                  {res.external_url && (
+                    <a
+                      href={res.external_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full flex items-center justify-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-indigo-400 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.98]"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Abrir Enlace</span>
+                    </a>
+                  )}
+                </div>
               </div>
             )
           })}
