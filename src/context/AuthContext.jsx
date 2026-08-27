@@ -183,19 +183,47 @@ export const AuthProvider = ({ children }) => {
 
     initApp()
 
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        fetchVisibility()
+        fetchSettings()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          fetchProfile(session.user.id)
+        }
+      }
+    }
+
+    window.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleVisibilityChange)
+
     return () => {
       activeSubscription?.unsubscribe()
+      window.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleVisibilityChange)
     }
   }, [])
 
-  const register = async ({ email, password, nombre, tel }) => {
+  const register = async (emailOrObj, password, nombre, tel) => {
+    let emailVal = emailOrObj
+    let passVal = password
+    let nomVal = nombre
+    let telVal = tel
+
+    if (typeof emailOrObj === 'object' && emailOrObj !== null) {
+      emailVal = emailOrObj.email
+      passVal = emailOrObj.password
+      nomVal = emailOrObj.nombre
+      telVal = emailOrObj.tel
+    }
+
     const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
+      email: emailVal,
+      password: passVal,
       options: {
         data: {
-          nombre,
-          tel,
+          nombre: nomVal,
+          tel: telVal,
           rol: 'visita'
         }
       }
