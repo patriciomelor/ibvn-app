@@ -129,49 +129,6 @@ export const AuthProvider = ({ children }) => {
 
     const appleIcon = document.querySelector('link[rel="apple-touch-icon"]')
     if (appleIcon) appleIcon.setAttribute('href', iconUrl)
-
-    // 3. Dynamic PWA Manifest
-    let manifestLink = document.querySelector('link[rel="manifest"]')
-    if (!manifestLink) {
-      manifestLink = document.createElement('link')
-      manifestLink.setAttribute('rel', 'manifest')
-      document.head.appendChild(manifestLink)
-    }
-
-    const dynamicManifest = {
-      name: `${settings.name || 'Vida Nueva'} App`,
-      short_name: settings.name || 'Vida Nueva',
-      description: `Aplicación ministerial oficial de ${settings.name || 'Vida Nueva'}.`,
-      theme_color: '#1e293b',
-      background_color: '#0f172a',
-      display: 'standalone',
-      orientation: 'portrait',
-      scope: '/',
-      start_url: '/',
-      icons: [
-        {
-          src: iconUrl,
-          sizes: '192x192',
-          type: 'image/png'
-        },
-        {
-          src: iconUrl,
-          sizes: '512x512',
-          type: 'image/png'
-        },
-        {
-          src: iconUrl,
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'any maskable'
-        }
-      ]
-    }
-
-    const stringManifest = JSON.stringify(dynamicManifest)
-    const blob = new Blob([stringManifest], { type: 'application/json' })
-    const manifestURL = URL.createObjectURL(blob)
-    manifestLink.setAttribute('href', manifestURL)
   }
 
   useEffect(() => {
@@ -219,6 +176,7 @@ export const AuthProvider = ({ children }) => {
         console.error('Error during initApp:', err)
         setUser(null)
         setProfile(null)
+      } finally {
         setLoading(false)
       }
     }

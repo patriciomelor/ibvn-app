@@ -157,14 +157,27 @@ export default function Recursos() {
                 </p>
               </div>
 
-              <div className="flex flex-col justify-center gap-3">
-                <button
-                  onClick={() => handleDownload(item)}
-                  className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3.5 px-6 rounded-xl transition-all active:scale-[0.98] text-xs font-display shadow-lg shadow-indigo-950/50"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Descargar Recurso</span>
-                </button>
+              <div className="flex flex-col sm:flex-row lg:flex-col justify-center gap-3">
+                {item.file_url && (
+                  <button
+                    onClick={() => handleDownload(item)}
+                    className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3.5 px-6 rounded-xl transition-all active:scale-[0.98] text-xs font-display shadow-lg shadow-indigo-950/50"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Descargar Archivo</span>
+                  </button>
+                )}
+                {item.external_url && (
+                  <a
+                    href={item.external_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-400 border border-slate-200 dark:border-slate-800 py-3.5 px-6 rounded-xl transition-all text-xs font-semibold font-display"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Abrir Enlace</span>
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -229,14 +242,29 @@ export default function Recursos() {
                         <span className="text-[10px] text-slate-500 font-semibold">
                           Descargas: {item.downloads_count || 0}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDownload(item)}
-                          className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-xl text-xs transition-all active:scale-95 shadow-md shadow-indigo-950/30"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Descargar Recurso</span>
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {item.file_url && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownload(item)}
+                              className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-xl text-xs transition-all active:scale-95 shadow-md shadow-indigo-950/30"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Descargar Archivo</span>
+                            </button>
+                          )}
+                          {item.external_url && (
+                            <a
+                              href={item.external_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-400 border border-slate-200 dark:border-slate-800 py-2 px-4 rounded-xl text-xs font-semibold transition-all"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span>Abrir Enlace</span>
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -288,7 +316,6 @@ export default function Recursos() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredResources.map((res) => {
-            // Icono según categoría
             const getCategoryIcon = (cat) => {
               switch (cat) {
                 case 'Manuales':
@@ -330,14 +357,29 @@ export default function Recursos() {
                   </p>
                 </div>
 
-                {/* Botón Descarga */}
-                <button
-                  onClick={() => handleDownload(res)}
-                  className="w-full flex items-center justify-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 text-indigo-400 py-2.5 rounded-xl text-xs font-semibold mt-4 transition-all active:scale-[0.98]"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Descargar Recurso</span>
-                </button>
+                {/* Botones de Acción */}
+                <div className="flex flex-col gap-2 mt-4">
+                  {res.file_url && (
+                    <button
+                      onClick={() => handleDownload(res)}
+                      className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.98]"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Descargar Archivo</span>
+                    </button>
+                  )}
+                  {res.external_url && (
+                    <a
+                      href={res.external_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full flex items-center justify-center space-x-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-indigo-400 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.98]"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Abrir Enlace</span>
+                    </a>
+                  )}
+                </div>
               </div>
             )
           })}

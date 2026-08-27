@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe, Send, Lock, Building, Star } from 'lucide-react'
+import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe, Send, Lock, Building, Star, X } from 'lucide-react'
 import { sendWhatsAppMessage, notifySubscribersAboutDevocional } from '../lib/whatsapp'
 
 export default function Admin() {
@@ -87,8 +87,12 @@ export default function Admin() {
   const [recursoDesc, setRecursoDesc] = useState('')
   const [recursoCategory, setRecursoCategory] = useState('Manuales')
   const [recursoFileUrl, setRecursoFileUrl] = useState('')
+  const [recursoExternalUrl, setRecursoExternalUrl] = useState('')
   const [recursoDestacado, setRecursoDestacado] = useState(false)
   const [recursoTargetAudience, setRecursoTargetAudience] = useState('visita')
+  const [isUploadingResourceFile, setIsUploadingResourceFile] = useState(false)
+  const [resourceFileFileName, setResourceFileFileName] = useState('')
+  const [showRecursoForm, setShowRecursoForm] = useState(false)
   const [editingRecursoId, setEditingRecursoId] = useState(null)
 
   // --- NUEVOS ESTADOS MINISTERIOS CRUD ---
@@ -220,6 +224,51 @@ export default function Admin() {
     }
   }
 
+  const handleUploadResourceFile = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMessage('El archivo no puede pesar más de 10MB.')
+      return
+    }
+
+    try {
+      setIsUploadingResourceFile(true)
+      setErrorMessage('')
+      setSuccessMessage('')
+
+      const fileExt = file.name.split('.').pop()
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+      const fileName = `${Date.now()}_${sanitizedName}.${fileExt}`
+      const filePath = `archivos/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('recursos')
+        .upload(filePath, file, { upsert: true })
+
+      if (uploadError) {
+        if (uploadError.message?.toLowerCase().includes('bucket not found') || uploadError.statusCode === '404') {
+          throw new Error('El bucket "recursos" no existe en Supabase Storage. Ejecuta la migración supabase_migration_mvp9_recursos_archivos.sql en el SQL Editor de Supabase o crea un bucket público llamado "recursos" en la consola de Supabase.')
+        }
+        throw uploadError
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('recursos')
+        .getPublicUrl(filePath)
+
+      setRecursoFileUrl(publicUrl)
+      setResourceFileFileName(file.name)
+      setSuccessMessage(`¡Archivo "${file.name}" subido con éxito!`)
+    } catch (err) {
+      console.error('Error subiendo archivo:', err.message)
+      setErrorMessage('Error al subir el archivo: ' + (err.message || 'Inténtelo de nuevo'))
+    } finally {
+      setIsUploadingResourceFile(false)
+    }
+  }
+
   useEffect(() => {
     if (activeTab === 'deportes') {
       fetchSportsAdmin()
@@ -311,15 +360,25 @@ export default function Admin() {
 
   const handleSaveRecurso = async (e) => {
     e.preventDefault()
-    setLoading(true)
     setErrorMessage('')
     setSuccessMessage('')
+
+    const fileUrl = (recursoFileUrl || '').trim()
+    const extUrl = (recursoExternalUrl || '').trim()
+
+    if (!fileUrl && !extUrl) {
+      setErrorMessage('Debes subir un archivo local (PDF/DOCX) o ingresar un enlace externo.')
+      return
+    }
+
+    setLoading(true)
     try {
       const recursoData = {
         title: recursoTitle,
         description: recursoDesc,
         category: recursoCategory,
-        file_url: recursoFileUrl,
+        file_url: fileUrl || extUrl,
+        external_url: extUrl || null,
         destacado: recursoDestacado,
         target_audience: recursoTargetAudience
       }
@@ -329,13 +388,36 @@ export default function Admin() {
           .from('recursos')
           .update(recursoData)
           .eq('id', editingRecursoId)
-        if (error) throw error
+        
+        if (error) {
+          if (error.message?.includes('external_url')) {
+            delete recursoData.external_url
+            const { error: retryErr } = await supabase
+              .from('recursos')
+              .update(recursoData)
+              .eq('id', editingRecursoId)
+            if (retryErr) throw retryErr
+          } else {
+            throw error
+          }
+        }
         setSuccessMessage('¡Recurso actualizado con éxito!')
       } else {
         const { error } = await supabase
           .from('recursos')
           .insert(recursoData)
-        if (error) throw error
+
+        if (error) {
+          if (error.message?.includes('external_url')) {
+            delete recursoData.external_url
+            const { error: retryErr } = await supabase
+              .from('recursos')
+              .insert(recursoData)
+            if (retryErr) throw retryErr
+          } else {
+            throw error
+          }
+        }
         setSuccessMessage('¡Recurso publicado con éxito!')
       }
 
@@ -343,12 +425,15 @@ export default function Admin() {
       setRecursoDesc('')
       setRecursoCategory('Manuales')
       setRecursoFileUrl('')
+      setRecursoExternalUrl('')
+      setResourceFileFileName('')
       setRecursoDestacado(false)
       setRecursoTargetAudience('visita')
       setEditingRecursoId(null)
+      setShowRecursoForm(false)
       await fetchResourcesAdmin()
     } catch (err) {
-      console.error(err)
+      console.error('Error saving resource:', err)
       setErrorMessage(err.message || 'Error al guardar el recurso.')
     } finally {
       setLoading(false)
@@ -360,9 +445,12 @@ export default function Admin() {
     setRecursoTitle(res.title)
     setRecursoDesc(res.description)
     setRecursoCategory(res.category)
-    setRecursoFileUrl(res.file_url)
+    setRecursoFileUrl(res.file_url || '')
+    setRecursoExternalUrl(res.external_url || '')
+    setResourceFileFileName('')
     setRecursoDestacado(res.destacado || false)
     setRecursoTargetAudience(res.target_audience || 'visita')
+    setShowRecursoForm(true)
   }
 
   // --- HANDLERS CHURCH SETTINGS ---
@@ -2070,138 +2158,252 @@ export default function Admin() {
 
       {/* TAB 5: GESTIÓN RECURSOS */}
       {activeTab === 'recursos' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Formulario de Recurso */}
-          <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 h-fit space-y-6">
+        <div className="space-y-6">
+          {/* Cabecera y Botón Desplegable */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-100/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white">
-                {editingRecursoId ? 'Editar Recurso' : 'Nuevo Recurso'}
+              <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white flex items-center space-x-2">
+                <FileText className="w-5 h-5 text-indigo-400" />
+                <span>Gestión de la Biblioteca Digital</span>
               </h3>
-              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-                Agrega manuales, guías o el kit replicable a la biblioteca digital.
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
+                Publica y administra manuales, guías y recursos académicos para la iglesia.
               </p>
             </div>
 
-            <form onSubmit={handleSaveRecurso} className="space-y-4">
-              <div>
-                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Título del Recurso</label>
-                <input
-                  type="text"
-                  required
-                  value={recursoTitle}
-                  onChange={(e) => setRecursoTitle(e.target.value)}
-                  placeholder="Ej: Manual del Discipulador"
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Descripción Corta</label>
-                <textarea
-                  required
-                  rows="3"
-                  value={recursoDesc}
-                  onChange={(e) => setRecursoDesc(e.target.value)}
-                  placeholder="Breve descripción del contenido del archivo..."
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-605 focus:outline-none focus:border-indigo-500 text-xs leading-relaxed"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Categoría</label>
-                <select
-                  value={recursoCategory}
-                  onChange={(e) => setRecursoCategory(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
-                >
-                  <option value="Manuales">Manuales</option>
-                  <option value="Escuela">Escuela de Líderes</option>
-                  <option value="Kit Replicable">Kit Replicable</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Audiencia / Nivel de Acceso</label>
-                <select
-                  value={recursoTargetAudience}
-                  onChange={(e) => setRecursoTargetAudience(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
-                >
-                  <option value="visita">Visitas (Cualquiera registrado)</option>
-                  <option value="miembro">Solo Miembros Activos</option>
-                  <option value="lider">Solo Líderes y Pastores</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">URL de Descarga del Archivo</label>
-                <input
-                  type="url"
-                  required
-                  value={recursoFileUrl}
-                  onChange={(e) => setRecursoFileUrl(e.target.value)}
-                  placeholder="https://ejemplo.com/recurso.pdf"
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs"
-                />
-              </div>
-
-              <div className="flex items-center space-x-2.5 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                <input
-                  type="checkbox"
-                  id="recursoDestacado"
-                  checked={recursoDestacado}
-                  onChange={(e) => setRecursoDestacado(e.target.checked)}
-                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 cursor-pointer"
-                />
-                <label htmlFor="recursoDestacado" className="text-xs font-semibold text-amber-300 cursor-pointer flex items-center space-x-1.5">
-                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  <span>Destacar recurso en la biblioteca</span>
-                </label>
-              </div>
-
-              <div className="flex gap-2.5 pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-all text-xs font-display flex items-center justify-center space-x-1.5"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{editingRecursoId ? 'Guardar Cambios' : 'Publicar Recurso'}</span>
-                </button>
-                {editingRecursoId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingRecursoId(null)
-                      setRecursoTitle('')
-                      setRecursoDesc('')
-                      setRecursoCategory('Manuales')
-                      setRecursoFileUrl('')
-                      setRecursoDestacado(false)
-                      setRecursoTargetAudience('visita')
-                    }}
-                    className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-700/50 py-2.5 px-4 rounded-xl transition-all text-xs font-semibold"
-                  >
-                    Cancelar
-                  </button>
-                )}
-              </div>
-            </form>
+            <button
+              onClick={() => {
+                if (showRecursoForm && editingRecursoId) {
+                  setEditingRecursoId(null)
+                  setRecursoTitle('')
+                  setRecursoDesc('')
+                  setRecursoFileUrl('')
+                  setRecursoExternalUrl('')
+                }
+                setShowRecursoForm(!showRecursoForm)
+              }}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 ${
+                showRecursoForm
+                  ? 'bg-slate-700 text-white hover:bg-slate-800'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white ring-2 ring-indigo-500/30'
+              }`}
+            >
+              {showRecursoForm ? (
+                <>
+                  <X className="w-4 h-4" />
+                  <span>Cerrar Formulario</span>
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="w-4 h-4" />
+                  <span>{editingRecursoId ? 'Editar Recurso' : 'Nuevo Recurso'}</span>
+                </>
+              )}
+            </button>
           </div>
 
-          {/* Listado de Recursos */}
-          <div className="lg:col-span-2 space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">Biblioteca de Recursos</h3>
+          {/* Formulario Desplegable de Ancho Completo (Acordeón) */}
+          {showRecursoForm && (
+            <div className="glass rounded-3xl p-6 md:p-8 border border-indigo-500/20 space-y-6 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <h4 className="text-md font-bold font-display text-slate-900 dark:text-white flex items-center space-x-2">
+                  <BookOpen className="w-5 h-5 text-indigo-400" />
+                  <span>{editingRecursoId ? 'Editar Recurso Publicado' : 'Publicar Nuevo Recurso'}</span>
+                </h4>
+                <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+                  Formulario de Publicación
+                </span>
+              </div>
+
+              {/* Alertas Locales dentro del Formulario */}
+              {errorMessage && (
+                <div className="flex items-start space-x-2.5 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+              {successMessage && (
+                <div className="flex items-start space-x-2.5 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+                  <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{successMessage}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveRecurso} className="space-y-6">
+                {/* Fila 1: Título y Categoría */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="md:col-span-2">
+                    <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Título del Recurso *</label>
+                    <input
+                      type="text"
+                      required
+                      value={recursoTitle}
+                      onChange={(e) => setRecursoTitle(e.target.value)}
+                      placeholder="Ej: Manual del Discipulador Cristiano"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Categoría *</label>
+                    <select
+                      value={recursoCategory}
+                      onChange={(e) => setRecursoCategory(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs font-semibold"
+                    >
+                      <option value="Manuales">📘 Manuales</option>
+                      <option value="Escuela">📙 Escuela de Líderes</option>
+                      <option value="Kit Replicable">💻 Kit Replicable</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Fila 2: Descripción y Audiencia */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="md:col-span-2">
+                    <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Descripción Corta *</label>
+                    <textarea
+                      required
+                      rows="2"
+                      value={recursoDesc}
+                      onChange={(e) => setRecursoDesc(e.target.value)}
+                      placeholder="Breve resumen del contenido y propósito de este material..."
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs leading-relaxed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-1.5">Audiencia / Nivel de Acceso *</label>
+                    <select
+                      value={recursoTargetAudience}
+                      onChange={(e) => setRecursoTargetAudience(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-xs font-semibold"
+                    >
+                      <option value="visita">Visitas (Cualquiera registrado)</option>
+                      <option value="miembro">Solo Miembros Activos</option>
+                      <option value="lider">Solo Líderes y Pastores</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Fila 3: Archivo Adjunto y Enlace Externo (Lado a Lado) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50/80 dark:bg-slate-900/40 rounded-2xl border border-slate-200/80 dark:border-slate-800/80">
+                  {/* Subir Archivo Local */}
+                  <div className="space-y-2">
+                    <label className="block text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
+                      <span>📄 Opción 1: Subir Archivo Local</span>
+                      <span className="text-[10px] text-slate-500 font-normal">PDF, DOCX, ZIP (Máx 10MB)</span>
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <label className="flex-1 cursor-pointer bg-white dark:bg-slate-900 border border-dashed border-indigo-500/40 hover:border-indigo-500 rounded-xl p-3 text-center transition-all flex items-center justify-center space-x-2 shadow-sm">
+                        <UploadCloud className="w-4 h-4 text-indigo-500 shrink-0" />
+                        <span className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
+                          {isUploadingResourceFile ? 'Subiendo a la nube...' : resourceFileFileName ? resourceFileFileName : 'Seleccionar archivo local...'}
+                        </span>
+                        <input
+                          type="file"
+                          onChange={handleUploadResourceFile}
+                          disabled={isUploadingResourceFile}
+                          className="hidden"
+                        />
+                      </label>
+                      {recursoFileUrl && (
+                        <button
+                          type="button"
+                          onClick={() => { setRecursoFileUrl(''); setResourceFileFileName(''); }}
+                          className="p-3 text-rose-400 hover:bg-rose-500/10 rounded-xl border border-rose-500/20 shrink-0"
+                          title="Eliminar archivo cargado"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    {recursoFileUrl && (
+                      <p className="text-[11px] text-emerald-400 font-semibold flex items-center space-x-1">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span className="truncate">Archivo adjunto listo</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Enlace Externo */}
+                  <div className="space-y-2">
+                    <label className="block text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider">
+                      🔗 Opción 2: Enlace Externo (Web / YouTube / Drive)
+                    </label>
+                    <input
+                      type="url"
+                      value={recursoExternalUrl}
+                      onChange={(e) => setRecursoExternalUrl(e.target.value)}
+                      placeholder="https://drive.google.com/... o https://youtube.com/..."
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-700 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Fila 4: Checkbox Destacado y Botones */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center space-x-2.5 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl w-full sm:w-auto">
+                    <input
+                      type="checkbox"
+                      id="recursoDestacado"
+                      checked={recursoDestacado}
+                      onChange={(e) => setRecursoDestacado(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 cursor-pointer"
+                    />
+                    <label htmlFor="recursoDestacado" className="text-xs font-bold text-amber-300 cursor-pointer flex items-center space-x-1.5">
+                      <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                      <span>Destacar este recurso en la portada de la biblioteca</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowRecursoForm(false)
+                        setEditingRecursoId(null)
+                        setRecursoTitle('')
+                        setRecursoDesc('')
+                        setRecursoFileUrl('')
+                        setRecursoExternalUrl('')
+                        setResourceFileFileName('')
+                        setRecursoDestacado(false)
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-semibold text-xs transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading || isUploadingResourceFile}
+                      className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-900/30 flex items-center justify-center space-x-2 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{editingRecursoId ? 'Guardar Cambios' : 'Publicar Recurso'}</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Listado de Recursos Publicados (Grilla de 3 Columnas) */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">
+              Biblioteca de Recursos Publicados ({resources.length})
+            </h3>
+
             {resources.length === 0 ? (
               <div className="glass rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-850">
                 <p className="text-slate-500 text-xs italic">No hay recursos publicados en la base de datos.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {resources.map((res) => (
-                  <div key={res.id} className="glass rounded-3xl p-5 border border-slate-200 dark:border-slate-850 flex items-start justify-between gap-4">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center space-x-2">
+                  <div key={res.id} className="glass rounded-3xl p-5 border border-slate-200 dark:border-slate-850 flex flex-col justify-between space-y-4 hover:border-indigo-500/30 transition-all">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="bg-indigo-950/20 border border-indigo-900/10 text-indigo-400 font-bold px-2 py-0.5 rounded-lg text-[9px] uppercase">
                           {res.category === 'Escuela' ? 'Escuela de Líderes' : res.category}
                         </span>
@@ -2224,39 +2426,33 @@ export default function Admin() {
                             <span>Destacado</span>
                           </span>
                         )}
-                        <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">{res.title}</h4>
                       </div>
-                      <p className="text-slate-500 dark:text-slate-400 text-[10.5px] leading-relaxed">{res.description}</p>
-                      <div className="flex items-center space-x-3 text-[10px] text-slate-500">
-                        <span>Descargas: {res.downloads_count}</span>
-                        <span>•</span>
-                        <a
-                          href={res.file_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-indigo-400 hover:underline flex items-center space-x-0.5"
-                        >
-                          <span>Ver archivo</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      </div>
+
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-white leading-tight pt-1">{res.title}</h4>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed line-clamp-3">{res.description}</p>
                     </div>
 
-                    <div className="flex items-center space-x-2 shrink-0">
-                      <button
-                        onClick={() => handleEditRecurso(res)}
-                        className="p-1.5 text-indigo-400 hover:bg-indigo-950/40 border border-indigo-500/10 rounded-lg hover:text-indigo-300 transition-all"
-                        title="Editar recurso"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteRecurso(res.id)}
-                        className="p-1.5 text-rose-400 hover:bg-rose-950/40 border border-rose-500/10 rounded-lg hover:text-rose-300 transition-all"
-                        title="Eliminar recurso"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 font-semibold font-mono">
+                        Descargas: {res.downloads_count || 0}
+                      </span>
+
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleEditRecurso(res)}
+                          className="p-2 text-indigo-400 hover:bg-indigo-950/40 border border-indigo-500/10 rounded-xl hover:text-indigo-300 transition-all"
+                          title="Editar recurso"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecurso(res.id)}
+                          className="p-2 text-rose-400 hover:bg-rose-950/40 border border-rose-500/10 rounded-xl hover:text-rose-300 transition-all"
+                          title="Eliminar recurso"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
