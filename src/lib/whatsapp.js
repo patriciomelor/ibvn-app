@@ -38,10 +38,96 @@ async function notifySubscribers(message, supabase) {
   })
 }
 
-export function notifySubscribersAboutDevocional(titulo, supabase) {
-  return notifySubscribers(`Nuevo devocional disponible: ${titulo}`, supabase)
+export async function notifySubscribersAboutDevocional(titulo, supabase) {
+  const { data: subscribers, error } = await supabase
+    .from('profiles')
+    .select('nombre, tel')
+    .eq('whatsapp_optin', true)
+    .not('tel', 'is', null)
+
+  if (error) throw error
+
+  if (subscribers.length === 0) {
+    return { success: true, summary: { total: 0, enviadosExitosamente: 0, fallidos: 0 }, detalles: [] }
+  }
+
+  const results = []
+
+  for (const { nombre, tel } of subscribers) {
+    try {
+      const res = await sendWhatsAppMessage({
+        to: tel,
+        templateName: 'ibvn_nuevo_devocional',
+        languageCode: 'es_CL',
+        templateParams: [nombre, titulo]
+      })
+      results.push(...(res.detalles || []))
+    } catch (err) {
+      results.push({
+        phone: tel,
+        status: 'error',
+        error: err.message
+      })
+    }
+  }
+
+  const totalSuccess = results.filter(r => r.status === 'success').length
+  const totalError = results.filter(r => r.status === 'error').length
+
+  return {
+    success: totalSuccess > 0,
+    summary: {
+      total: results.length,
+      enviadosExitosamente: totalSuccess,
+      fallidos: totalError
+    },
+    detalles: results
+  }
 }
 
-export function notifySubscribersAboutResource(title, category, supabase) {
-  return notifySubscribers(`Nuevo material disponible: ${title} (${category})`, supabase)
+export async function notifySubscribersAboutResource(title, category, supabase) {
+  const { data: subscribers, error } = await supabase
+    .from('profiles')
+    .select('nombre, tel')
+    .eq('whatsapp_optin', true)
+    .not('tel', 'is', null)
+
+  if (error) throw error
+
+  if (subscribers.length === 0) {
+    return { success: true, summary: { total: 0, enviadosExitosamente: 0, fallidos: 0 }, detalles: [] }
+  }
+
+  const results = []
+
+  for (const { nombre, tel } of subscribers) {
+    try {
+      const res = await sendWhatsAppMessage({
+        to: tel,
+        templateName: 'ibvn_nuevo_recurso',
+        languageCode: 'es_CL',
+        templateParams: [nombre, title, category]
+      })
+      results.push(...(res.detalles || []))
+    } catch (err) {
+      results.push({
+        phone: tel,
+        status: 'error',
+        error: err.message
+      })
+    }
+  }
+
+  const totalSuccess = results.filter(r => r.status === 'success').length
+  const totalError = results.filter(r => r.status === 'error').length
+
+  return {
+    success: totalSuccess > 0,
+    summary: {
+      total: results.length,
+      enviadosExitosamente: totalSuccess,
+      fallidos: totalError
+    },
+    detalles: results
+  }
 }
