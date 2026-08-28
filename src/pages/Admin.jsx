@@ -2849,7 +2849,11 @@ export default function Admin() {
                   setWaSending(true)
                   setWaTestResult(null)
                   try {
-                    const res = await sendWhatsAppMessage({ to: waTestPhone, message: waTestMessage })
+                    const res = await sendWhatsAppMessage({
+                      to: waTestPhone,
+                      templateName: 'test_bienvenida_ibvn_app',
+                      languageCode: 'es_CL'
+                    })
                     setWaTestResult(res)
                   } catch (err) {
                     setWaTestResult({ success: false, error: err.message || String(err) })
