@@ -1,169 +1,47 @@
-// Vercel Serverless Function: Integración con Kapso (WhatsApp Business)
+const WHATSAPP_ENDPOINT = '/api/whatsapp-notify'
 
-function sanitizeChileanPhone(phoneStr) {
-  if (!phoneStr) return ''
-  // Eliminar todo lo que no sea número
-  let cleaned = String(phoneStr).replace(/\D/g, '')
+export async function sendWhatsAppMessage({ to, recipients, message, templateName, languageCode, templateParams }) {
+  const response = await fetch(WHATSAPP_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to, recipients, message, templateName, languageCode, templateParams })
+  })
 
-  // Si tiene 9 dígitos y empieza con 9 (ej. 912345678), agregar el prefijo 56 de Chile
-  if (cleaned.length === 9 && cleaned.startsWith('9')) {
-    cleaned = '56' + cleaned
-  }
-  // Si tiene 8 dígitos y es celular chileno (ej. 87654321), agregar 569
-  else if (cleaned.length === 8) {
-    cleaned = '569' + cleaned
+  const data = await response.json()
+  if (!response.ok) {
+    throw new Error(data?.error || 'Error enviando mensaje por WhatsApp')
   }
 
-  return cleaned
+  return data
 }
 
-export default async function handler(req, res) {
-  // Configuración de encabezados CORS
-  res.setHeader('Access-Control-Allow-Credentials', true)
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'OPTIONS,POST')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+async function notifySubscribers(message, supabase) {
+  const { data: subscribers, error } = await supabase
+    .from('profiles')
+    .select('phone')
+    .eq('whatsapp_optin', true)
+    .not('phone', 'is', null)
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
+  if (error) throw error
+
+  const recipients = subscribers
+    .map(({ phone }) => phone)
+    .filter(phone => String(phone).trim())
+
+  if (recipients.length === 0) {
+    return { success: true, summary: { total: 0, enviadosExitosamente: 0, fallidos: 0 }, detalles: [] }
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido. Usa POST.' })
-  }
+  return sendWhatsAppMessage({
+    recipients,
+    message
+  })
+}
 
-  try {
-    const apiKey = process.env.KAPSO_API_KEY
-    const phoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID
+export function notifySubscribersAboutDevocional(titulo, supabase) {
+  return notifySubscribers(`Nuevo devocional disponible: ${titulo}`, supabase)
+}
 
-    if (!apiKey || !phoneNumberId) {
-      return res.status(500).json({
-        error: 'Las credenciales de Kapso (KAPSO_API_KEY y KAPSO_PHONE_NUMBER_ID) no están configuradas en las variables de entorno de Vercel.'
-      })
-    }
-
-    const { to, recipients, message, templateName, languageCode, templateParams } = req.body
-
-    const isTemplate = !!templateName
-
-    if (!isTemplate && (!message || typeof message !== 'string' || !message.trim())) {
-      return res.status(400).json({ error: 'El campo "message" es requerido y no puede estar vacío (o envía "templateName" para usar un template).' })
-    }
-
-    // Lista de números a los que enviar
-    let targetNumbers = []
-
-    if (to) {
-      targetNumbers.push(to)
-    } else if (Array.isArray(recipients) && recipients.length > 0) {
-      targetNumbers = recipients
-    } else {
-      return res.status(400).json({ error: 'Debes proporcionar "to" (un número) o "recipients" (arreglo de números).' })
-    }
-
-    const results = []
-    const kapsoUrl = `https://api.kapso.ai/meta/whatsapp/v24.0/${phoneNumberId}/messages`
-
-    for (const rawPhone of targetNumbers) {
-      const formattedPhone = sanitizeChileanPhone(rawPhone)
-
-      if (!formattedPhone || formattedPhone.length < 11) {
-        results.push({
-          phone: rawPhone,
-          status: 'error',
-          error: 'Número de teléfono no válido o incompleto'
-        })
-        continue
-      }
-
-      // Arma el payload según el tipo de envío
-      let payload
-
-      if (isTemplate) {
-        const components = []
-
-        // templateParams: arreglo de strings para variables posicionales {{1}}, {{2}}, ...
-        if (Array.isArray(templateParams) && templateParams.length > 0) {
-          components.push({
-            type: 'body',
-            parameters: templateParams.map(text => ({ type: 'text', text: String(text) }))
-          })
-        }
-
-        payload = {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: formattedPhone,
-          type: 'template',
-          template: {
-            name: templateName,
-            language: { code: languageCode || 'es_CL' },
-            ...(components.length > 0 ? { components } : {})
-          }
-        }
-      } else {
-        payload = {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: formattedPhone,
-          type: 'text',
-          text: { body: message.trim() }
-        }
-      }
-
-      try {
-        const response = await fetch(kapsoUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': apiKey
-          },
-          body: JSON.stringify(payload)
-        })
-
-        const responseData = await response.json()
-
-        if (!response.ok) {
-          results.push({
-            phone: formattedPhone,
-            status: 'error',
-            statusCode: response.status,
-            error: responseData?.error || responseData || 'Error enviando mensaje por Kapso'
-          })
-        } else {
-          results.push({
-            phone: formattedPhone,
-            status: 'success',
-            data: responseData
-          })
-        }
-      } catch (sendErr) {
-        results.push({
-          phone: formattedPhone,
-          status: 'error',
-          error: sendErr.message || 'Error de conexión con Kapso'
-        })
-      }
-    }
-
-    const totalSuccess = results.filter(r => r.status === 'success').length
-    const totalError = results.filter(r => r.status === 'error').length
-
-    return res.status(200).json({
-      success: totalSuccess > 0,
-      summary: {
-        total: results.length,
-        enviadosExitosamente: totalSuccess,
-        fallidos: totalError
-      },
-      detalles: results
-    })
-
-  } catch (error) {
-    console.error('Error interno en api/whatsapp-notify:', error)
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Error interno del servidor'
-    })
-  }
+export function notifySubscribersAboutResource(title, category, supabase) {
+  return notifySubscribers(`Nuevo material disponible: ${title} (${category})`, supabase)
 }

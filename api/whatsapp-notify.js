@@ -42,10 +42,15 @@ export default async function handler(req, res) {
       })
     }
 
-    const { to, recipients, message } = req.body
+    const { to, recipients, message, templateName, languageCode, templateParams } = req.body
+    const isTemplate = Boolean(templateName)
 
-    if (!message || typeof message !== 'string' || !message.trim()) {
-      return res.status(400).json({ error: 'El campo "message" es requerido y no puede estar vacío.' })
+    if (!isTemplate && (!message || typeof message !== 'string' || !message.trim())) {
+      return res.status(400).json({ error: 'El campo "message" es requerido, salvo que envíes "templateName".' })
+    }
+
+    if (isTemplate && (typeof templateName !== 'string' || !templateName.trim())) {
+      return res.status(400).json({ error: 'El campo "templateName" no puede estar vacío.' })
     }
 
     // Lista de números a los que enviar
@@ -74,6 +79,33 @@ export default async function handler(req, res) {
         continue
       }
 
+      const payload = isTemplate
+        ? {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: formattedPhone,
+            type: 'template',
+            template: {
+              name: templateName.trim(),
+              language: { code: languageCode || 'es_CL' },
+              ...(Array.isArray(templateParams) && templateParams.length > 0
+                ? {
+                    components: [{
+                      type: 'body',
+                      parameters: templateParams.map(text => ({ type: 'text', text: String(text) }))
+                    }]
+                  }
+                : {})
+            }
+          }
+        : {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: formattedPhone,
+            type: 'text',
+            text: { body: message.trim() }
+          }
+
       try {
         const response = await fetch(kapsoUrl, {
           method: 'POST',
@@ -81,13 +113,7 @@ export default async function handler(req, res) {
             'Content-Type': 'application/json',
             'X-API-Key': apiKey
           },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            recipient_type: 'individual',
-            to: formattedPhone,
-            type: 'text',
-            text: { body: message.trim() }
-          })
+          body: JSON.stringify(payload)
         })
 
         const responseData = await response.json()
