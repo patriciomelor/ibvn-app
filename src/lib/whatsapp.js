@@ -1,99 +1,47 @@
-// Utilidad para envío de mensajes por WhatsApp a través del conector Kapso
+const WHATSAPP_ENDPOINT = '/api/whatsapp-notify'
 
-/**
- * Normaliza un número chileno al formato internacional E.164 (ej. 56912345678)
- */
-export function formatChileanPhone(phoneStr) {
-  if (!phoneStr) return ''
-  let cleaned = String(phoneStr).replace(/\D/g, '')
+export async function sendWhatsAppMessage({ to, recipients, message, templateName, languageCode, templateParams }) {
+  const response = await fetch(WHATSAPP_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to, recipients, message, templateName, languageCode, templateParams })
+  })
 
-  // Si tiene 9 dígitos y empieza con 9 (ej. 912345678), agregar 56
-  if (cleaned.length === 9 && cleaned.startsWith('9')) {
-    cleaned = '56' + cleaned
-  }
-  // Si tiene 8 dígitos y empieza con 9 u 8, agregar 569
-  else if (cleaned.length === 8) {
-    cleaned = '569' + cleaned
+  const data = await response.json()
+  if (!response.ok) {
+    throw new Error(data?.error || 'Error enviando mensaje por WhatsApp')
   }
 
-  return cleaned
+  return data
 }
 
-/**
- * Llama al endpoint servidor /api/whatsapp-notify para enviar un mensaje
- */
-export async function sendWhatsAppMessage({ to, recipients, message }) {
-  try {
-    const response = await fetch('/api/whatsapp-notify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ to, recipients, message })
-    })
+async function notifySubscribers(message, supabase) {
+  const { data: subscribers, error } = await supabase
+    .from('profiles')
+    .select('phone')
+    .eq('whatsapp_optin', true)
+    .not('phone', 'is', null)
 
-    const data = await response.json()
-    if (!response.ok) {
-      throw new Error(data.error?.message || data.error || 'Error al comunicarse con el servidor de WhatsApp')
-    }
+  if (error) throw error
 
-    return data
-  } catch (error) {
-    console.error('Error en sendWhatsAppMessage:', error)
-    throw error
+  const recipients = subscribers
+    .map(({ phone }) => phone)
+    .filter(phone => String(phone).trim())
+
+  if (recipients.length === 0) {
+    return { success: true, summary: { total: 0, enviadosExitosamente: 0, fallidos: 0 }, detalles: [] }
   }
+
+  return sendWhatsAppMessage({
+    recipients,
+    message
+  })
 }
 
-/**
- * Notifica automáticamente a todos los miembros que activaron WhatsApp Opt-In
- * cuando se publica un nuevo devocional
- */
-export async function notifySubscribersAboutDevocional(devocionalTitle, supabaseClient) {
-  try {
-    if (!supabaseClient) {
-      console.warn('Cliente Supabase no disponible para notificaciones WhatsApp')
-      return { success: false, reason: 'Sin cliente Supabase' }
-    }
+export function notifySubscribersAboutDevocional(titulo, supabase) {
+  return notifySubscribers(`Nuevo devocional disponible: ${titulo}`, supabase)
+}
 
-    // 1. Consultar usuarios con opt-in activo y teléfono registrado
-    const { data: subscribers, error } = await supabaseClient
-      .from('profiles')
-      .select('nombre, tel, whatsapp_optin')
-      .eq('whatsapp_optin', true)
-      .not('tel', 'is', null)
-
-    if (error) {
-      console.error('Error obteniendo miembros para WhatsApp:', error)
-      return { success: false, error: error.message }
-    }
-
-    if (!subscribers || subscribers.length === 0) {
-      console.log('No hay miembros con notificaciones de WhatsApp activas')
-      return { success: true, message: 'No hay suscriptores con WhatsApp opt-in' }
-    }
-
-    // 2. Extraer números de teléfono válidos
-    const validPhones = subscribers
-      .map(s => formatChileanPhone(s.tel))
-      .filter(phone => phone && phone.length >= 11)
-
-    if (validPhones.length === 0) {
-      return { success: true, message: 'Ningún suscriptor tiene un teléfono válido registrado' }
-    }
-
-    // 3. Formatear mensaje
-    const messageText = `📖 *Nuevo Devocional Disponible en Vida Nueva App*\n\nHola, ya está disponible el devocional de hoy: *"${devocionalTitle}"*.\n\nIngresa a la aplicación para leer el pasaje bíblico y registrar tus reflexiones.`
-
-    // 4. Enviar a través del servidor
-    const result = await sendWhatsAppMessage({
-      recipients: validPhones,
-      message: messageText
-    })
-
-    return result
-
-  } catch (err) {
-    console.error('Error enviando notificaciones de devocional:', err)
-    return { success: false, error: err.message }
-  }
+export function notifySubscribersAboutResource(title, category, supabase) {
+  return notifySubscribers(`Nuevo material disponible: ${title} (${category})`, supabase)
 }

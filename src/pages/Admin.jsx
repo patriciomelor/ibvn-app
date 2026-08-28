@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe, Send, Lock, Building, Star, X } from 'lucide-react'
-import { sendWhatsAppMessage, notifySubscribersAboutDevocional } from '../lib/whatsapp'
+import { sendWhatsAppMessage, notifySubscribersAboutDevocional, notifySubscribersAboutResource } from '../lib/whatsapp'
 
 export default function Admin() {
   const { user, isPastorAdmin, moduleVisibility, refreshVisibility } = useAuth()
@@ -419,6 +419,10 @@ export default function Admin() {
           }
         }
         setSuccessMessage('¡Recurso publicado con éxito!')
+
+        notifySubscribersAboutResource(recursoTitle, recursoCategory, supabase)
+          .then(res => console.log('Notificación WhatsApp de recurso enviada:', res))
+          .catch(err => console.error('Error enviando WhatsApp de recurso:', err))
       }
 
       setRecursoTitle('')
