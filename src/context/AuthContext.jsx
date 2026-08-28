@@ -85,6 +85,10 @@ export const AuthProvider = ({ children }) => {
                   email: authUser.email,
                   nombre: authUser.user_metadata?.nombre || authUser.user_metadata?.name || 'Miembro Nuevo',
                   tel: authUser.user_metadata?.tel || '',
+                  whatsapp_optin: authUser.user_metadata?.whatsapp_optin === true,
+                  whatsapp_optin_date: authUser.user_metadata?.whatsapp_optin
+                    ? authUser.user_metadata?.whatsapp_optin_date || new Date().toISOString()
+                    : null,
                   rol: 'visita'
                 })
                 .select('*, cargo, celulas:celula_id(nombre), ministerios:ministerio_id(nombre)')
@@ -216,17 +220,19 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  const register = async (emailOrObj, password, nombre, tel) => {
+  const register = async (emailOrObj, password, nombre, tel, whatsappOptin = false) => {
     let emailVal = emailOrObj
     let passVal = password
     let nomVal = nombre
     let telVal = tel
+    let whatsappOptinVal = whatsappOptin
 
     if (typeof emailOrObj === 'object' && emailOrObj !== null) {
       emailVal = emailOrObj.email
       passVal = emailOrObj.password
       nomVal = emailOrObj.nombre
       telVal = emailOrObj.tel
+      whatsappOptinVal = emailOrObj.whatsappOptin || false
     }
 
     const { data, error } = await supabase.auth.signUp({
@@ -236,6 +242,8 @@ export const AuthProvider = ({ children }) => {
         data: {
           nombre: nomVal,
           tel: telVal,
+          whatsapp_optin: whatsappOptinVal,
+          whatsapp_optin_date: whatsappOptinVal ? new Date().toISOString() : null,
           rol: 'visita'
         }
       }
