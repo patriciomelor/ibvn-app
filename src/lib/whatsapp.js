@@ -18,15 +18,15 @@ export async function sendWhatsAppMessage({ to, recipients, message, templateNam
 async function notifySubscribers(message, supabase) {
   const { data: subscribers, error } = await supabase
     .from('profiles')
-    .select('phone')
+    .select('nombre, tel')
     .eq('whatsapp_optin', true)
-    .not('phone', 'is', null)
+    .not('tel', 'is', null)
 
   if (error) throw error
 
   const recipients = subscribers
-    .map(({ phone }) => phone)
-    .filter(phone => String(phone).trim())
+    .map(({ tel }) => tel)
+    .filter(tel => String(tel).trim())
 
   if (recipients.length === 0) {
     return { success: true, summary: { total: 0, enviadosExitosamente: 0, fallidos: 0 }, detalles: [] }

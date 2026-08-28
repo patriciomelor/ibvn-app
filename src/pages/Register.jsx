@@ -1,12 +1,14 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Lock, Mail, User, Phone, ShieldAlert, CheckCircle, Eye, EyeOff, Check } from 'lucide-react'
+import { Lock, Mail, User, Phone, ShieldAlert, CheckCircle, Eye, EyeOff, Check, MessageSquare } from 'lucide-react'
+import { sendWhatsAppMessage } from '../lib/whatsapp'
 
 export default function Register() {
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [tel, setTel] = useState('')
+  const [whatsappOptin, setWhatsappOptin] = useState(false)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -37,7 +39,19 @@ export default function Register() {
     setLoading(true)
 
     try {
-      await register({ email, password, nombre, tel })
+      await register({ email, password, nombre, tel, whatsappOptin })
+
+      if (whatsappOptin) {
+        sendWhatsAppMessage({
+          to: tel,
+          templateName: 'ibvn_bienvenida',
+          languageCode: 'es_CL',
+          templateParams: [nombre]
+        }).catch((whatsappError) => {
+          console.error('Error enviando bienvenida por WhatsApp:', whatsappError)
+        })
+      }
+
       setSuccess(true)
       setTimeout(() => {
         navigate('/login')
@@ -131,6 +145,19 @@ export default function Register() {
               />
             </div>
           </div>
+
+          <label className="flex items-start gap-3 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl cursor-pointer">
+            <input
+              type="checkbox"
+              checked={whatsappOptin}
+              onChange={(e) => setWhatsappOptin(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+            />
+            <span className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              <MessageSquare className="w-4 h-4 shrink-0 text-emerald-500 mt-0.5" />
+              <span>Autorizo a IBVN a enviarme por WhatsApp la bienvenida, devocionales y recursos de la iglesia.</span>
+            </span>
+          </label>
 
           <div>
             <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
