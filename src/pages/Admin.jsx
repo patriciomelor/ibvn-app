@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe, Send, Lock, Building, Star, X } from 'lucide-react'
+import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe, Send, Lock, Building, Star, X, Flame } from 'lucide-react'
 import { sendWhatsAppMessage, notifySubscribersAboutDevocional, notifySubscribersAboutResource } from '../lib/whatsapp'
 
 export default function Admin() {
@@ -1202,52 +1202,58 @@ export default function Admin() {
         </button>
       </div>
 
-      {/* NAVEGACIÓN PRINCIPAL DEL PANEL ADMINISTRADOR */}
-      <div className="bg-slate-100/80 dark:bg-slate-900/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
-        <div className="flex items-center justify-between px-2 pt-0.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          <span>Menú de Gestión Pastoral</span>
-          <span className="hidden sm:inline text-indigo-400 font-semibold">Vida Nueva App Admin</span>
+      {/* CONTENEDOR PRINCIPAL: SIDEBAR EN ESCRITORIO, TOP BAR EN MÓVIL */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        
+        {/* NAVEGACIÓN PRINCIPAL DEL PANEL ADMINISTRADOR */}
+        <div className="w-full lg:w-56 xl:w-64 shrink-0 bg-slate-100/80 dark:bg-slate-900/60 p-3 rounded-2xl lg:rounded-3xl border border-slate-200 dark:border-slate-800 lg:sticky lg:top-8 space-y-2 lg:space-y-4">
+          <div className="flex items-center justify-between lg:justify-center px-2 pt-0.5 pb-1 lg:pb-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="lg:hidden">Menú de Gestión Pastoral</span>
+            <span className="hidden lg:inline text-center leading-tight">Menú de Gestión<br/>Pastoral</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-1 gap-2">
+            {[
+              { id: 'devocional', label: 'Devocional', icon: BookOpen },
+              { id: 'reporte_devocionales', label: 'Reporte Devo.', icon: Flame },
+              { id: 'recursos', label: 'Recursos', icon: FileText },
+              { id: 'crm', label: 'CRM Pastoral', icon: UserCheck },
+              { id: 'usuarios', label: 'Usuarios', icon: Users },
+              { id: 'ministerios_crud', label: 'Ministerios', icon: Award },
+              { id: 'metricas', label: 'Métricas', icon: Activity, count: unresolvedAlerts.length },
+              { id: 'configuracion', label: 'Ajustes', icon: Settings },
+            ].map((tab) => {
+              const Icon = tab.icon
+              const active = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id)
+                    setSelectedUser(null)
+                  }}
+                  className={`flex items-center justify-center lg:justify-start space-x-3 px-3 lg:px-4 py-2.5 lg:py-3 rounded-xl text-xs font-bold transition-all duration-200 ${active
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30 ring-2 ring-indigo-500/50 lg:scale-105'
+                    : 'bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800 lg:border-transparent lg:hover:border-slate-200/60 lg:dark:hover:border-slate-800/60'
+                    }`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-indigo-400'}`} />
+                  <span className="truncate">{tab.label}</span>
+                  {tab.count !== undefined && tab.count > 0 && (
+                    <span className={`ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-black ${active ? 'bg-rose-500 text-white' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-          {[
-            { id: 'devocional', label: 'Devocional', icon: BookOpen },
-            { id: 'reporte_devocionales', label: 'Reporte Devo.', icon: Flame },
-            { id: 'recursos', label: 'Recursos', icon: FileText },
-            { id: 'crm', label: 'CRM Pastoral', icon: UserCheck },
-            { id: 'usuarios', label: 'Usuarios', icon: Users },
-            { id: 'ministerios_crud', label: 'Ministerios', icon: Award },
-            { id: 'metricas', label: 'Métricas', icon: Activity, count: unresolvedAlerts.length },
-            { id: 'configuracion', label: 'Ajustes', icon: Settings },
-          ].map((tab) => {
-            const Icon = tab.icon
-            const active = activeTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id)
-                  setSelectedUser(null)
-                }}
-                className={`flex items-center justify-center sm:justify-start space-x-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${active
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30 ring-2 ring-indigo-500/50 scale-[1.02]'
-                  : 'bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800'
-                  }`}
-              >
-                <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-indigo-400'}`} />
-                <span className="truncate">{tab.label}</span>
-                {tab.count !== undefined && tab.count > 0 && (
-                  <span className={`ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-black ${active ? 'bg-rose-500 text-white' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Alertas */}
+        {/* CONTENIDO PRINCIPAL */}
+        <div className="flex-1 w-full min-w-0 space-y-8">
+          
+          {/* Alertas */}
       {successMessage && (
         <div className="glass-emerald flex items-center space-x-2 p-4 rounded-xl text-emerald-300 text-sm">
           <CheckCircle className="w-5 h-5 shrink-0 text-emerald-400" />
@@ -3120,7 +3126,7 @@ export default function Admin() {
                           <span className="font-semibold text-slate-900 dark:text-white">{p.nombre}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 capitalize">{p.rol.replace('_', ' ')}</td>
+                      <td className="px-6 py-4 capitalize">{(p.rol || '').replace('_', ' ')}</td>
                       <td className="px-6 py-4 text-center">
                         <span className="inline-flex items-center space-x-1 bg-orange-100 text-orange-600 px-2.5 py-1 rounded-full font-bold text-xs">
                           <Flame className="w-3.5 h-3.5" />
@@ -3145,6 +3151,8 @@ export default function Admin() {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   )
 }

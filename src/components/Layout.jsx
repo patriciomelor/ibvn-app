@@ -144,11 +144,10 @@ export default function Layout({ children }) {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  active
-                    ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 shadow-md shadow-indigo-950/20'
-                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/60 dark:bg-slate-800/60 hover:text-slate-700 dark:text-slate-200 border border-transparent'
-                }`}
+                className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${active
+                  ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 shadow-md shadow-indigo-950/20'
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/60 dark:bg-slate-800/60 hover:text-slate-700 dark:text-slate-200 border border-transparent'
+                  }`}
               >
                 <Icon className={`w-5 h-5 ${active ? 'text-indigo-400' : 'text-slate-500 dark:text-slate-400'}`} />
                 <span>{item.label}</span>
@@ -198,7 +197,7 @@ export default function Layout({ children }) {
           <img src={churchSettings?.logo_url || "/favicon.png"} alt="Logo" className="w-8 h-8 rounded-lg shadow-sm border border-indigo-500/20 object-cover shrink-0" />
           <h1 className="text-sm font-bold font-display tracking-tight text-slate-900 dark:text-white truncate">{churchSettings?.name || 'Vida Nueva'}</h1>
         </div>
-        
+
         <div className="flex items-center space-x-1 shrink-0">
           <button
             onClick={handleInstallClick}
@@ -302,11 +301,10 @@ export default function Layout({ children }) {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center space-x-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                      active
-                        ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 border border-transparent'
-                    }`}
+                    className={`flex items-center space-x-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${active
+                      ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 border border-transparent'
+                      }`}
                   >
                     <Icon className={`w-5 h-5 ${active ? 'text-indigo-400' : 'text-slate-500 dark:text-slate-400'}`} />
                     <span>{item.label}</span>
@@ -347,7 +345,7 @@ export default function Layout({ children }) {
 
       {/* 3. CONTENIDO PRINCIPAL */}
       <main className="flex-1 flex flex-col min-w-0 pb-6 overflow-y-auto">
-        <div className="max-w-4xl w-full mx-auto p-4 md:p-8 animate-fade-in">
+        <div className="max-w-6xl w-full mx-auto p-4 md:p-8 animate-fade-in">
           {children}
         </div>
       </main>
