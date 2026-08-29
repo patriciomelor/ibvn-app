@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, Calendar, Save, Share2, CheckCircle, Loader, AlertCircle } from 'lucide-react'
+import { BookOpen, Calendar, Save, Share2, CheckCircle, Loader, AlertCircle, Flame } from 'lucide-react'
 
 export default function Devocional() {
   const { user } = useAuth()
@@ -18,17 +18,35 @@ export default function Devocional() {
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [userStats, setUserStats] = useState({ racha_actual: 0, puntos_totales: 0 })
 
-  // 1. Cargar el último devocional publicado
+  // 1. Cargar el devocional de hoy (o el último publicado si es antiguo)
   const fetchLatestDevotional = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
+      const today = new Date().toISOString().split('T')[0]
+      
+      // Intentar buscar el devocional asignado para hoy (o el más reciente anterior a hoy)
+      let { data, error } = await supabase
         .from('devocionales')
         .select('*')
-        .order('published_at', { ascending: false })
+        .lte('fecha_asignada', today)
+        .order('fecha_asignada', { ascending: false })
         .limit(1)
         .maybeSingle()
+
+      // Fallback: si no hay devocionales con fecha_asignada, traer el último publicado
+      if (!data) {
+        const legacy = await supabase
+          .from('devocionales')
+          .select('*')
+          .order('published_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        
+        data = legacy.data
+        error = legacy.error
+      }
 
       if (error) throw error
 
@@ -70,8 +88,30 @@ export default function Devocional() {
     }
   }
 
+  // Cargar estadísticas de gamificación (racha y puntos)
+  const fetchUserStats = async () => {
+    if (!user) return
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('racha_actual, puntos_totales')
+        .eq('id', user.id)
+        .maybeSingle()
+        
+      if (data) {
+        setUserStats({
+          racha_actual: data.racha_actual || 0,
+          puntos_totales: data.puntos_totales || 0
+        })
+      }
+    } catch (err) {
+      console.error('Error fetching user stats:', err)
+    }
+  }
+
   useEffect(() => {
     fetchLatestDevotional()
+    if (user) fetchUserStats()
   }, [user])
 
   // 3. Guardar diario en Supabase
@@ -84,19 +124,18 @@ export default function Devocional() {
     setErrorMessage('')
 
     try {
-      // Intentar buscar si ya existe para decidir si hacer INSERT o UPDATE (o usar upsert nativo)
-      const { error } = await supabase
-        .from('devotional_journal')
-        .upsert({
-          user_id: user.id,
-          devocional_id: devocional.id,
-          apreciacion: journal.apreciacion,
-          cambios: journal.cambios,
-          oracion_personal: journal.oracion_personal,
-          created_at: new Date().toISOString()
-        }, { onConflict: 'user_id,devocional_id' })
+      // Usar la función RPC para guardar el diario y actualizar rachas/puntos transaccionalmente
+      const { error } = await supabase.rpc('completar_devocional', {
+        p_devocional_id: devocional.id,
+        p_apreciacion: journal.apreciacion,
+        p_cambios: journal.cambios,
+        p_oracion_personal: journal.oracion_personal
+      })
 
       if (error) throw error
+
+      // Refrescar las estadísticas del usuario para mostrar la nueva racha/puntos
+      await fetchUserStats()
 
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
@@ -180,8 +219,17 @@ https://vidanueva.app/`
             </h2>
           </div>
           
-          {/* Botones de acción rápida */}
-          <div className="flex items-center space-x-2">
+          {/* Botones de acción rápida y Gamificación */}
+          <div className="flex flex-wrap items-center gap-3">
+            {user && (
+              <div className="flex items-center space-x-2 bg-orange-100/50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-3 py-1.5 rounded-xl text-xs font-bold border border-orange-200 dark:border-orange-900/50">
+                <Flame className="w-4 h-4 text-orange-500" />
+                <span>Racha: {userStats.racha_actual} 🔥</span>
+                <span className="opacity-50 mx-1">|</span>
+                <span>{userStats.puntos_totales} pts</span>
+              </div>
+            )}
+
             <button
               onClick={handleShareWhatsApp}
               className="flex items-center space-x-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 px-3.5 py-2 rounded-xl text-xs font-medium transition-all active:scale-95"
@@ -190,7 +238,6 @@ https://vidanueva.app/`
               <Share2 className="w-4 h-4" />
               <span className="hidden sm:inline">Compartir</span>
             </button>
-
           </div>
         </div>
 
@@ -219,6 +266,18 @@ https://vidanueva.app/`
                 {devocional.reflexion}
               </p>
             </div>
+
+            {/* Aplicativo (Opcional - IA) */}
+            {devocional.aplicativo && (
+              <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 bg-indigo-50/50 dark:bg-indigo-950/20">
+                <h3 className="text-indigo-500 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider mb-4">
+                  Aplicativo Práctico
+                </h3>
+                <p className="text-slate-700 dark:text-slate-200 leading-relaxed text-justify whitespace-pre-line text-sm sm:text-base">
+                  {devocional.aplicativo}
+                </p>
+              </div>
+            )}
 
             {/* Oración Guiada */}
             <div className="bg-gradient-to-r from-slate-900 to-indigo-950/40 rounded-3xl p-6 border border-indigo-900/10">
@@ -271,6 +330,21 @@ https://vidanueva.app/`
               ) : (
                 <form onSubmit={handleSaveJournal} className="space-y-5">
                   
+                  {/* Preguntas Aplicativas (Opcional - IA) */}
+                  {devocional.preguntas && (
+                    <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40">
+                      <h4 className="text-amber-800 dark:text-amber-500 text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <Flame className="w-4 h-4" /> Preguntas para reflexionar hoy:
+                      </h4>
+                      <ul className="list-disc pl-5 text-amber-900 dark:text-amber-200 text-sm space-y-1">
+                        {Array.isArray(devocional.preguntas) 
+                          ? devocional.preguntas.map((p, i) => <li key={i}>{p}</li>)
+                          : <li className="whitespace-pre-line">{devocional.preguntas}</li>
+                        }
+                      </ul>
+                    </div>
+                  )}
+
                   {/* Bloque 1: Lo que Dios me dijo */}
                   <div>
                     <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold mb-2">

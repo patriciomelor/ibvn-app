@@ -1209,9 +1209,10 @@ export default function Admin() {
           <span className="hidden sm:inline text-indigo-400 font-semibold">Vida Nueva App Admin</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
           {[
             { id: 'devocional', label: 'Devocional', icon: BookOpen },
+            { id: 'reporte_devocionales', label: 'Reporte Devo.', icon: Flame },
             { id: 'recursos', label: 'Recursos', icon: FileText },
             { id: 'crm', label: 'CRM Pastoral', icon: UserCheck },
             { id: 'usuarios', label: 'Usuarios', icon: Users },
@@ -3074,6 +3075,74 @@ export default function Admin() {
                 })}
               </div>
             )}
+          </div>
+        </div>
+        </div>
+      )}
+
+      {/* 11. REPORTE DEVOCIONALES */}
+      {activeTab === 'reporte_devocionales' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold font-display text-slate-900 dark:text-white">Reporte de Devocionales</h2>
+              <p className="text-slate-500 text-sm">Constancia y Rachas del Liderazgo</p>
+            </div>
+            <div className="flex items-center space-x-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-900/50">
+              <Activity className="w-4 h-4" />
+              <span>Ranking 🔥</span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
+                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs uppercase font-bold tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-6 py-4">Líder / Miembro</th>
+                    <th className="px-6 py-4">Rol</th>
+                    <th className="px-6 py-4 text-center">Racha Actual 🔥</th>
+                    <th className="px-6 py-4 text-center">Racha Máxima</th>
+                    <th className="px-6 py-4 text-center">Puntos Totales</th>
+                    <th className="px-6 py-4 text-right">Último Devocional</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                  {profiles
+                    .filter(p => p.rol !== 'miembro' || p.racha_actual > 0) // Mostrar todos los líderes, y miembros que tengan rachas
+                    .sort((a, b) => (b.racha_actual || 0) - (a.racha_actual || 0))
+                    .map((p, index) => (
+                    <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${index < 3 ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                            #{index + 1}
+                          </div>
+                          <span className="font-semibold text-slate-900 dark:text-white">{p.nombre}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 capitalize">{p.rol.replace('_', ' ')}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center space-x-1 bg-orange-100 text-orange-600 px-2.5 py-1 rounded-full font-bold text-xs">
+                          <Flame className="w-3.5 h-3.5" />
+                          <span>{p.racha_actual || 0}</span>
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center font-medium">{p.racha_maxima || 0}</td>
+                      <td className="px-6 py-4 text-center font-bold text-indigo-600 dark:text-indigo-400">{p.puntos_totales || 0}</td>
+                      <td className="px-6 py-4 text-right text-xs">
+                        {p.ultimo_devocional_completado_fecha ? new Date(p.ultimo_devocional_completado_fecha).toLocaleDateString('es-CL') : 'Nunca'}
+                      </td>
+                    </tr>
+                  ))}
+                  {profiles.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-8 text-center text-slate-500">Cargando datos...</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
