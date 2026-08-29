@@ -15,6 +15,11 @@ export async function sendWhatsAppMessage({ to, recipients, message, templateNam
   return data
 }
 
+function cleanPhone(tel) {
+  if (!tel) return ''
+  return String(tel).replace(/\D/g, '')
+}
+
 async function notifySubscribers(message, supabase) {
   const { data: subscribers, error } = await supabase
     .from('profiles')
@@ -24,9 +29,16 @@ async function notifySubscribers(message, supabase) {
 
   if (error) throw error
 
+  const seen = new Set()
   const recipients = subscribers
     .map(({ tel }) => tel)
-    .filter(tel => String(tel).trim())
+    .filter(tel => {
+      const cleaned = cleanPhone(tel)
+      if (!cleaned) return false
+      if (seen.has(cleaned)) return false
+      seen.add(cleaned)
+      return true
+    })
 
   if (recipients.length === 0) {
     return { success: true, summary: { total: 0, enviadosExitosamente: 0, fallidos: 0 }, detalles: [] }
@@ -51,9 +63,19 @@ export async function notifySubscribersAboutDevocional(titulo, supabase) {
     return { success: true, summary: { total: 0, enviadosExitosamente: 0, fallidos: 0 }, detalles: [] }
   }
 
+  const uniqueSubscribers = []
+  const seen = new Set()
+  for (const sub of subscribers) {
+    const cleaned = cleanPhone(sub.tel)
+    if (cleaned && !seen.has(cleaned)) {
+      seen.add(cleaned)
+      uniqueSubscribers.push(sub)
+    }
+  }
+
   const results = []
 
-  for (const { nombre, tel } of subscribers) {
+  for (const { nombre, tel } of uniqueSubscribers) {
     try {
       const res = await sendWhatsAppMessage({
         to: tel,
@@ -98,9 +120,19 @@ export async function notifySubscribersAboutResource(title, category, supabase) 
     return { success: true, summary: { total: 0, enviadosExitosamente: 0, fallidos: 0 }, detalles: [] }
   }
 
+  const uniqueSubscribers = []
+  const seen = new Set()
+  for (const sub of subscribers) {
+    const cleaned = cleanPhone(sub.tel)
+    if (cleaned && !seen.has(cleaned)) {
+      seen.add(cleaned)
+      uniqueSubscribers.push(sub)
+    }
+  }
+
   const results = []
 
-  for (const { nombre, tel } of subscribers) {
+  for (const { nombre, tel } of uniqueSubscribers) {
     try {
       const res = await sendWhatsAppMessage({
         to: tel,
