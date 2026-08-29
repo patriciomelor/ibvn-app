@@ -3077,7 +3077,6 @@ export default function Admin() {
             )}
           </div>
         </div>
-        </div>
       )}
 
       {/* 11. REPORTE DEVOCIONALES */}
