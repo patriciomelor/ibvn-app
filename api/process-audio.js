@@ -63,22 +63,38 @@ export default async function handler(req, res) {
 
     // 3. Procesar con Claude 3.5 Sonnet
     console.log('Generando contenido del devocional con Claude...');
-    const prompt = `Eres un asistente pastoral para la "Vida Nueva App" de la Iglesia Bautista Vida Nueva en Santiago, Chile.
-Tu tarea es tomar la siguiente transcripción de un audio devocional grabado por un pastor, y generar el contenido estructurado final para la app.
+    const prompt = `Eres un redactor pastoral de la Iglesia Bautista Vida Nueva (IBVN).
+Tu tarea es convertir la transcripción de un audio o sermón en un devocional diario en formato de libro de bolsillo (A6), estilo Charles Spurgeon.
 
-INSTRUCCIONES CLAVES:
-- Mantén la fidelidad del mensaje bíblico y pastoral original.
-- Corrige muletillas, tartamudeos y mejora la gramática sin perder el tono conversacional.
-- Estructura el cuerpo del texto en párrafos cortos (3-4 líneas máximo) para lectura ágil en móviles.
+REGLAS DE ESTILO:
+- Abre con una observación aguda sobre una palabra o frase concreta del versículo.
+- Usa una imagen cotidiana y visual (oficio, casa, campo, mercado, ciudad) para explicar la verdad.
+- Habla al lector de tú, con calidez y algo de urgencia, como un pastor que conoce a su gente.
+- Frases cortas y con ritmo. Cero tecnicismos, cero griego o hebreo, cero citas de autores.
+- Termina con una frase memorable que el lector pueda llevarse al día.
+- Mantén una teología bautista evangélica conservadora, centrada en Cristo y en la gracia.
+
+LÍMITES ESTRICTOS:
+- Título: máximo 7 palabras.
+- Versículo: máximo 35 palabras, textual con referencia exacta.
+- Comentario (reflexion): entre 110 y 130 palabras.
+- Gratitud: 1 pregunta disparadora, máximo 10 palabras.
+- Oración: 1 motivo, máximo 10 palabras.
+- Acción: 1 acción pequeña, concreta y realizable hoy, máximo 10 palabras.
 
 FORMATO DE SALIDA:
-Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta (sin formato markdown adicional ni bloques \`\`\`json):
+Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta (sin markdown ni bloques \`\`\`json):
 {
-  "titulo": "Un título breve y atractivo (max 60 chars)",
-  "versiculo_referencia": "Ej: Juan 3:16 (LBLA)",
-  "versiculo_texto": "El texto bíblico clave mencionado en el audio",
-  "cuerpo_texto": "El contenido principal del devocional estructurado en HTML muy básico (solo etiquetas <p> y <strong>)",
-  "frase_reflexion": "Una frase corta y poderosa (max 100 chars) para reflexionar durante el día"
+  "titulo": "Título de máx 7 palabras",
+  "versiculo_referencia": "Referencia exacta (ej: Salmo 23:1 · RVR1960)",
+  "versiculo_texto": "Texto bíblico textual",
+  "texto_biblico": "«Texto bíblico textual» — Referencia",
+  "reflexion": "Comentario de entre 110 y 130 palabras con estilo pastoral Spurgeon...",
+  "cuerpo_texto": "Comentario de entre 110 y 130 palabras...",
+  "gratitud_pregunta": "Pregunta disparadora de máx 10 palabras",
+  "oracion": "Motivo de oración de máx 10 palabras",
+  "frase_reflexion": "Motivo de oración de máx 10 palabras",
+  "accion": "Acción pequeña y concreta de máx 10 palabras"
 }
 
 Transcripción del pastor:
