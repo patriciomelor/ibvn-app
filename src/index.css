@@ -205,3 +205,32 @@
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari and Opera */
 }
+
+/* ==========================================================================
+   ESTILOS DE IMPRESIÓN PARA DEVOCIONAL EN FORMATO LIBRO DE BOLSILLO (A6)
+   ========================================================================== */
+@media print {
+  @page {
+    size: A6 portrait;
+    margin: 8mm;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #1a1a1a !important;
+  }
+
+  header, nav, aside, .no-print, button:not(.print-include) {
+    display: none !important;
+  }
+
+  .print-page {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    page-break-after: always;
+    break-after: page;
+  }
+}

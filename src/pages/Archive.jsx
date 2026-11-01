@@ -142,10 +142,15 @@ export default function Archive() {
                         {dev.titulo}
                       </h4>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-500 dark:text-slate-400 text-xs mt-1.5 font-medium">
-                        <span className="text-indigo-400">{dev.texto_biblico}</span>
+                        {dev.dia_nombre && (
+                          <span className="bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-md">
+                            {dev.dia_nombre} · Día {dev.dia_numero || ''}
+                          </span>
+                        )}
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{dev.texto_biblico}</span>
                         <span className="flex items-center space-x-1">
                           <Calendar className="w-3.5 h-3.5" />
-                          <span>{formatDate(dev.published_at)}</span>
+                          <span>{formatDate(dev.fecha_asignada || dev.published_at)}</span>
                         </span>
                         <span className="flex items-center space-x-1">
                           <Clock className="w-3.5 h-3.5" />
@@ -174,14 +179,34 @@ export default function Archive() {
                             {dev.reflexion}
                           </p>
                         </div>
-                        <div className="border-t border-slate-200 dark:border-slate-800/40 pt-4">
-                          <span className="text-indigo-400 text-[10px] font-bold uppercase tracking-wider block mb-1">
+                        {dev.gratitud_pregunta && (
+                          <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-200/60 dark:border-amber-900/30">
+                            <span className="text-amber-800 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider block mb-0.5">
+                              Gratitud
+                            </span>
+                            <p className="text-amber-900 dark:text-amber-200 text-xs font-medium">
+                              {dev.gratitud_pregunta}
+                            </p>
+                          </div>
+                        )}
+                        <div className="border-t border-slate-200 dark:border-slate-800/40 pt-3">
+                          <span className="text-[#0e7490] dark:text-cyan-400 text-[10px] font-bold uppercase tracking-wider block mb-1">
                             Oración
                           </span>
-                          <p className="text-indigo-200 text-sm leading-relaxed italic">
+                          <p className="text-slate-700 dark:text-cyan-200 text-sm leading-relaxed italic">
                             {dev.oracion}
                           </p>
                         </div>
+                        {dev.accion && (
+                          <div className="bg-emerald-50 dark:bg-emerald-950/20 p-3 rounded-xl border border-emerald-200/60 dark:border-emerald-900/30">
+                            <span className="text-emerald-800 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wider block mb-0.5">
+                              Acción de Hoy
+                            </span>
+                            <p className="text-emerald-900 dark:text-emerald-200 text-xs font-medium">
+                              {dev.accion}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Registro del Diario en este devocional */}
