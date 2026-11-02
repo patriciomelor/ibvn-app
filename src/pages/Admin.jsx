@@ -830,7 +830,16 @@ export default function Admin() {
         body: JSON.stringify({ filePath })
       })
 
-      const result = await response.json()
+      const rawText = await response.text()
+      let result
+      try {
+        result = JSON.parse(rawText)
+      } catch {
+        const reason = rawText.includes('FUNCTION_INVOCATION_TIMEOUT')
+          ? 'el procesamiento superó el tiempo máximo del servidor'
+          : rawText.slice(0, 120)
+        throw new Error(`Error del servidor (${response.status}): ${reason}`)
+      }
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Error al procesar el audio.')
