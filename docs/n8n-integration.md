@@ -4,6 +4,27 @@ Este documento detalla la integración de **n8n** con **Supabase** para el nuevo
 
 ---
 
+## 0. Arquitectura de Carga vía Supabase Storage (.md)
+
+En este flujo:
+1. **n8n** procesa la transcripción del sermón dominical con el modelo de IA.
+2. La IA genera el devocional completo en formato Markdown (`.md`).
+3. **n8n** sube el archivo `.md` a Supabase Storage en el bucket **`devocionales_md`** (ej: `devocional_2026-09-06.md`).
+4. **La App (Panel Pastoral)** verifica periódicamente (cada 45 segundos o con el botón manual) si hay archivos nuevos en Storage.
+5. El pastor previsualiza el archivo, **modifica o corrige cualquier texto directamente** y lo importa a la base de datos con un clic.
+
+### Subida del archivo .md a Supabase Storage desde n8n
+- **Método**: `POST`
+- **URL**: `https://[TU_PROYECTO_SUPABASE].supabase.co/storage/v1/object/devocionales_md/devocional_{{ $json.sermon_fecha }}.md`
+- **Headers**:
+  - `apikey`: `TU_SUPABASE_SERVICE_ROLE_KEY`
+  - `Authorization`: `Bearer TU_SUPABASE_SERVICE_ROLE_KEY`
+  - `Content-Type`: `text/markdown; charset=utf-8`
+  - `x-upsert`: `true`
+- **Body**: Texto en Markdown generado por el nodo LLM.
+
+---
+
 ## 1. El Prompt de IA en n8n
 
 El prompt implementado en el nodo de Inteligencia Artificial (OpenAI, Claude, etc.) en n8n toma los datos del sermón dominical y su transcripción para generar los 7 devocionales diarios:
@@ -74,13 +95,14 @@ Coloca este nodo de tipo **Code** (Run Once for All Items o Run Once for Each It
 // Input esperado: $input.first().json.output o $input.first().json.text
 const rawText = $input.first().json.output || $input.first().json.text || '';
 
-// Datos del sermón (pueden venir de variables anteriores o extraerse de parámetros del workflow)
+// Datos del sermón enviados por la App al Webhook (n8n los anida bajo `body`)
+const hook = $('Webhook').first().json.body || $('Webhook').first().json;
 const sermonMetadata = {
-  sermon_titulo: $('Webhook').first().json.sermon_titulo || 'Sermón Dominical',
-  sermon_predicador: $('Webhook').first().json.sermon_predicador || 'Pastor IBVN',
-  sermon_fecha: $('Webhook').first().json.sermon_fecha || new Date().toISOString().split('T')[0],
-  sermon_texto_base: $('Webhook').first().json.sermon_texto_base || '',
-  sermon_version: $('Webhook').first().json.sermon_version || 'RVR1960'
+  sermon_titulo: hook.sermon_titulo || 'Sermón Dominical',
+  sermon_predicador: hook.sermon_predicador || 'Pastor IBVN',
+  sermon_fecha: hook.sermon_fecha || new Date().toISOString().split('T')[0],
+  sermon_texto_base: hook.sermon_texto_base || '',
+  sermon_version: hook.sermon_version || 'LBLA'
 };
 
 // Calcular semana del año

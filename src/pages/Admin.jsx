@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe, Send, Lock, Building, Star, X, Flame, List, Copy, Eye, Clock, Sparkles } from 'lucide-react'
+import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe, Send, Lock, Building, Star, X, Flame, List, Copy, Eye, Clock, Sparkles, RefreshCw, Cloud, Download, CheckCircle2, FolderOpen, FileCheck } from 'lucide-react'
 import { sendWhatsAppMessage, notifySubscribersAboutDevocional, notifySubscribersAboutResource } from '../lib/whatsapp'
 import { parseDevocionalSemanal, getWeekNumber } from '../lib/devocionalParser'
+import defaultLogo from '../assets/logo-ibvn.png'
 
 export default function Admin() {
   const { user, isPastorAdmin, moduleVisibility, refreshVisibility } = useAuth()
@@ -23,16 +24,24 @@ export default function Admin() {
   const [adminDevocionales, setAdminDevocionales] = useState([])
   const [loadingDevocionales, setLoadingDevocionales] = useState(false)
   const [selectedDevocionalSemana, setSelectedDevocionalSemana] = useState(null)
-  const [devocionalSubTab, setDevocionalSubTab] = useState('list') // 'list', 'import', 'manual'
+  const [devocionalSubTab, setDevocionalSubTab] = useState('list') // 'list', 'storage'
   const [rawMarkdownDevocional, setRawMarkdownDevocional] = useState('')
   const [parsedWeeklyPreview, setParsedWeeklyPreview] = useState(null)
   const [editingDevocional, setEditingDevocional] = useState(null)
+  const [editingWeekInfo, setEditingWeekInfo] = useState(null)
 
-  // 1.5 Datos del Generador IA
-  const [audioFile, setAudioFile] = useState(null)
-  const [isGeneratingIA, setIsGeneratingIA] = useState(false)
-  const [iaError, setIaError] = useState('')
-  const [iaStatus, setIaStatus] = useState('')
+  // 1.3 Estados de Supabase Storage para Devocionales .md
+  const [storageFiles, setStorageFiles] = useState([])
+  const [loadingStorage, setLoadingStorage] = useState(false)
+  const [lastStorageSync, setLastStorageSync] = useState(null)
+  const [selectedStorageFile, setSelectedStorageFile] = useState(null)
+  const [loadingFileContent, setLoadingFileContent] = useState(false)
+  const [storageBucketName, setStorageBucketName] = useState('devocionales_md')
+  const [newFilesCount, setNewFilesCount] = useState(0)
+  const [searchStorageTerm, setSearchStorageTerm] = useState('')
+
+  // 1.5 Carga de Audio (Desactivada temporalmente para futura versión)
+  const [audioUploadDisabled] = useState(true)
 
   // 2. Datos de Miembros y Catastro
   const [profiles, setProfiles] = useState([])
@@ -789,82 +798,94 @@ export default function Admin() {
     loadAdminData()
   }, [isPastorAdmin])
 
-  // Generar Devocional con IA
-  const handleGenerateIA = async () => {
-    if (!audioFile) {
-      setIaError('Por favor selecciona un archivo de audio.')
-      return
+  // Polling periódico para buscar archivos nuevos en Supabase Storage
+  useEffect(() => {
+    if (activeTab === 'devocional') {
+      fetchStorageFiles(false)
+      const timer = setInterval(() => {
+        fetchStorageFiles(false)
+      }, 45000) // Revisa cada 45 segundos
+      return () => clearInterval(timer)
     }
-    setIsGeneratingIA(true)
-    setIaError('')
+  }, [activeTab, adminDevocionales.length])
 
+  // Listar archivos .md en Supabase Storage
+  const fetchStorageFiles = async (showLoading = true) => {
     try {
-      // 1. Comprimir audio (prédicas largas superan límites de Storage y Whisper)
-      let fileToUpload = audioFile
-      if (audioFile.size > 20 * 1024 * 1024) {
-        setIaStatus('1/3 Preparando compresor de audio...')
-        const { compressAudioForTranscription } = await import('../lib/compressAudio')
-        const originalMB = (audioFile.size / 1024 / 1024).toFixed(1)
-        fileToUpload = await compressAudioForTranscription(audioFile, (p) => {
-          setIaStatus(`1/3 Comprimiendo audio (${originalMB} MB)... ${Math.round(p * 100)}%`)
-        })
-      }
-
-      // 2. Subir a Supabase
-      setIaStatus(`2/3 Subiendo audio a la nube (${(fileToUpload.size / 1024 / 1024).toFixed(1)} MB)...`)
-      const fileExt = fileToUpload.name.split('.').pop()
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-      const filePath = `devocionales/${fileName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('audio_uploads')
-        .upload(filePath, fileToUpload, { contentType: fileToUpload.type || 'audio/mpeg' })
-
-      if (uploadError) throw new Error('Error al subir el audio: ' + uploadError.message)
-
-      // 3. Llamar API
-      setIaStatus('3/3 Transcribiendo y procesando con IA (una prédica larga puede tardar 2-4 min)...')
-      const response = await fetch('/api/process-audio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath })
+      if (showLoading) setLoadingStorage(true)
+      
+      let bucketToUse = 'devocionales_md'
+      let { data, error } = await supabase.storage.from('devocionales_md').list('', {
+        sortBy: { column: 'created_at', order: 'desc' }
       })
 
-      const rawText = await response.text()
-      let result
-      try {
-        result = JSON.parse(rawText)
-      } catch {
-        const reason = rawText.includes('FUNCTION_INVOCATION_TIMEOUT')
-          ? 'el procesamiento superó el tiempo máximo del servidor'
-          : rawText.slice(0, 120)
-        throw new Error(`Error del servidor (${response.status}): ${reason}`)
+      // Fallback a 'devocionales' si 'devocionales_md' no tiene archivos o arroja error
+      if (error || !data || data.length === 0) {
+        const fallback = await supabase.storage.from('devocionales').list('', {
+          sortBy: { column: 'created_at', order: 'desc' }
+        })
+        if (!fallback.error && fallback.data && fallback.data.length > 0) {
+          bucketToUse = 'devocionales'
+          data = fallback.data
+        }
       }
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Error al procesar el audio.')
-      }
+      setStorageBucketName(bucketToUse)
 
-      const { devocional } = result
+      // Filtrar archivos .md o devocionales
+      const mdFiles = (data || []).filter(f => 
+        f.name && (f.name.toLowerCase().endsWith('.md') || f.name.toLowerCase().includes('devocional'))
+      )
+      setStorageFiles(mdFiles)
+      setLastStorageSync(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
 
-      // 3. Rellenar formulario
-      setTitulo(devocional.titulo || '')
-      setTextoBiblico(`${devocional.versiculo_referencia || ''} - ${devocional.versiculo_texto || ''}`)
-      setReflexion(devocional.cuerpo_texto || '')
-      setOracion(devocional.frase_reflexion || '')
-
-      setIaStatus('¡Generación completada con éxito!')
-      setTimeout(() => setIaStatus(''), 5000)
-      setAudioFile(null)
-      const input = document.getElementById('audio_upload_input')
-      if (input) input.value = ''
+      // Detectar cuántos archivos están pendientes de importar comparando fechas
+      const loadedDates = new Set(adminDevocionales.map(d => d.fecha_asignada || d.sermon_fecha).filter(Boolean))
+      const pending = mdFiles.filter(f => {
+        const dateMatch = f.name.match(/(\d{4}[-/]\d{2}[-/]\d{2})|(\d{2}[-/]\d{2}[-/]\d{4})/)
+        if (!dateMatch) return true
+        let fileDate = dateMatch[0].replace(/\//g, '-')
+        if (fileDate.match(/^\d{2}-\d{2}-\d{4}$/)) {
+          const [d, m, y] = fileDate.split('-')
+          fileDate = `${y}-${m}-${d}`
+        }
+        return !loadedDates.has(fileDate)
+      })
+      setNewFilesCount(pending.length)
 
     } catch (err) {
-      console.error(err)
-      setIaError(err.message)
-      setIaStatus('')
+      console.warn('Error fetching storage files:', err.message)
     } finally {
-      setIsGeneratingIA(false)
+      if (showLoading) setLoadingStorage(false)
+    }
+  }
+
+  // Descargar y procesar archivo .md de Supabase Storage
+  const handleLoadStorageFile = async (file) => {
+    setSelectedStorageFile(file)
+    setLoadingFileContent(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      // 1. Descargar el archivo
+      const { data, error } = await supabase.storage.from(storageBucketName).download(file.name)
+      if (error) throw error
+
+      // 2. Extraer texto
+      const text = await data.text()
+      setRawMarkdownDevocional(text)
+
+      // 3. Parsear con devocionalParser
+      const parsed = parseDevocionalSemanal(text)
+      setParsedWeeklyPreview(parsed)
+      if (parsed.semana) setSemana(parsed.semana)
+
+      setSuccessMessage(`Archivo "${file.name}" cargado con éxito (${parsed.days.length} días detectados).`)
+    } catch (err) {
+      console.error(err)
+      setErrorMessage(`Error al leer archivo ${file.name}: ${err.message}`)
+    } finally {
+      setLoadingFileContent(false)
     }
   }
 
@@ -929,18 +950,6 @@ export default function Admin() {
       console.error('Error fetching admin devocionales:', err.message)
     } finally {
       setLoadingDevocionales(false)
-    }
-  }
-
-  // Parsear texto Markdown en tiempo real al escribir o pegar
-  const handleMarkdownChange = (text) => {
-    setRawMarkdownDevocional(text)
-    if (text.trim().length > 30) {
-      const parsed = parseDevocionalSemanal(text)
-      setParsedWeeklyPreview(parsed)
-      if (parsed.semana) setSemana(parsed.semana)
-    } else {
-      setParsedWeeklyPreview(null)
     }
   }
 
@@ -1050,6 +1059,37 @@ export default function Admin() {
     } catch (err) {
       console.error(err)
       setErrorMessage('Error al eliminar devocional: ' + err.message)
+    }
+  }
+
+  // Guardar corrección general del Sermón de la Semana (para los 7 días)
+  const handleSaveWeekSermonInfo = async (e) => {
+    e.preventDefault()
+    if (!editingWeekInfo) return
+    setLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+    try {
+      const { error } = await supabase
+        .from('devocionales')
+        .update({
+          sermon_titulo: editingWeekInfo.sermon_titulo,
+          sermon_predicador: editingWeekInfo.sermon_predicador,
+          sermon_fecha: editingWeekInfo.sermon_fecha,
+          sermon_texto_base: editingWeekInfo.sermon_texto_base,
+          sermon_version: editingWeekInfo.sermon_version
+        })
+        .eq('semana', editingWeekInfo.semana)
+
+      if (error) throw error
+      setSuccessMessage(`Datos del sermón de la Semana ${editingWeekInfo.semana} actualizados para todos sus días.`)
+      setEditingWeekInfo(null)
+      await fetchAdminDevocionales()
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Error al actualizar sermón: ' + err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1449,6 +1489,10 @@ export default function Admin() {
         const currentWeekDevotionals = adminDevocionales.filter(d => d.semana === selectedDevocionalSemana)
         const sermonInfo = currentWeekDevotionals.find(d => d.sermon_titulo) || currentWeekDevotionals[0] || {}
 
+        const filteredStorageFiles = storageFiles.filter(f => 
+          !searchStorageTerm || f.name.toLowerCase().includes(searchStorageTerm.toLowerCase())
+        )
+
         return (
           <div className="space-y-6">
             {/* Cabecera y Sub-Navegación */}
@@ -1459,12 +1503,12 @@ export default function Admin() {
                   <span>Devocionales Semanales (Formato Libro de Bolsillo)</span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Revisa, aprueba y publica los 7 devocionales generados por la IA / n8n para cada semana.
+                  Revisa, aprueba, corrige y sincroniza desde Storage los 7 devocionales de cada semana.
                 </p>
               </div>
 
               {/* Sub-Pestañas */}
-              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 self-start sm:self-auto">
+              <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setDevocionalSubTab('list')}
@@ -1475,38 +1519,41 @@ export default function Admin() {
                   }`}
                 >
                   <List className="w-3.5 h-3.5" />
-                  <span>Listado Semana</span>
+                  <span>Devocionales Cargados</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setDevocionalSubTab('import')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    devocionalSubTab === 'import'
+                  onClick={() => {
+                    setDevocionalSubTab('storage')
+                    fetchStorageFiles(true)
+                  }}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all relative ${
+                    devocionalSubTab === 'storage'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Importar IA / Markdown</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDevocionalSubTab('manual')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    devocionalSubTab === 'manual'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Manual / Audio</span>
+                  <Cloud className="w-3.5 h-3.5" />
+                  <span>Storage (.md)</span>
+                  {newFilesCount > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-amber-400/30 animate-pulse"></span>
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* VISTA 1: LISTADO DE LOS 7 DEVOCIONALES DE LA SEMANA */}
+            {/* AVISO INFORMATIVO DE AUDIO DESACTIVADO TEMPORALMENTE */}
+            <div className="bg-slate-100/80 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl px-4 py-2.5 flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>
+                  <strong>Flujo actual:</strong> Carga y sincronización mediante archivos <code>.md</code> en Supabase Storage o importación de texto. La carga de audio directo queda reservada para una próxima versión.
+                </span>
+              </div>
+            </div>
+
+            {/* VISTA 1: DEVOCIONALES CARGADOS EN LA SEMANA (CON MODIFICACIÓN PASTORAL) */}
             {devocionalSubTab === 'list' && (
               <div className="space-y-5">
                 {/* Selector de Semana y Resumen */}
@@ -1519,7 +1566,7 @@ export default function Admin() {
                           <button
                             key={wk}
                             onClick={() => setSelectedDevocionalSemana(wk)}
-                            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               selectedDevocionalSemana === wk
                                 ? 'bg-[#183328] text-white ring-2 ring-emerald-500/30'
                                 : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
@@ -1534,24 +1581,37 @@ export default function Admin() {
                     )}
                   </div>
 
-                  {currentWeekDevotionals.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
                     <button
                       type="button"
-                      onClick={() => {
-                        const titleToSend = sermonInfo.sermon_titulo || `Devocional Semanal IBVN (Semana ${selectedDevocionalSemana})`
-                        notifySubscribersAboutDevocional(titleToSend, supabase)
-                          .then(() => setSuccessMessage(`Notificación enviada por WhatsApp a suscriptores sobre la Semana ${selectedDevocionalSemana}`))
-                          .catch(e => setErrorMessage('Error al enviar WhatsApp: ' + e.message))
-                      }}
-                      className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-xs self-start md:self-auto cursor-pointer"
+                      onClick={() => fetchAdminDevocionales()}
+                      disabled={loadingDevocionales}
+                      className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs px-3 py-2 rounded-xl transition-all cursor-pointer"
+                      title="Refrescar lista"
                     >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Notificar Semana por WhatsApp</span>
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingDevocionales ? 'animate-spin' : ''}`} />
+                      <span>Refrescar</span>
                     </button>
-                  )}
+
+                    {currentWeekDevotionals.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const titleToSend = sermonInfo.sermon_titulo || `Devocional Semanal IBVN (Semana ${selectedDevocionalSemana})`
+                          notifySubscribersAboutDevocional(titleToSend, supabase)
+                            .then(() => setSuccessMessage(`Notificación enviada por WhatsApp a suscriptores sobre la Semana ${selectedDevocionalSemana}`))
+                            .catch(e => setErrorMessage('Error al enviar WhatsApp: ' + e.message))
+                        }}
+                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-xs cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Notificar por WhatsApp</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {/* Banner de Información del Sermón Base */}
+                {/* Banner de Información del Sermón Base con Opción de Edición */}
                 {currentWeekDevotionals.length > 0 && (
                   <div className="bg-[#183328] text-white rounded-3xl p-5 border border-emerald-900/40 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="space-y-1">
@@ -1569,15 +1629,34 @@ export default function Admin() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-emerald-950/60 border border-emerald-700/40 px-3.5 py-1.5 rounded-xl shrink-0">
-                      <span className="text-xs font-bold text-emerald-200">
-                        {currentWeekDevotionals.length} de 7 días cargados
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingWeekInfo({
+                          semana: selectedDevocionalSemana,
+                          sermon_titulo: sermonInfo.sermon_titulo || '',
+                          sermon_predicador: sermonInfo.sermon_predicador || 'Pastor IBVN',
+                          sermon_fecha: sermonInfo.sermon_fecha || '',
+                          sermon_texto_base: sermonInfo.sermon_texto_base || '',
+                          sermon_version: sermonInfo.sermon_version || 'LBLA'
+                        })}
+                        className="bg-emerald-800/60 hover:bg-emerald-700/60 text-white text-xs font-semibold px-3 py-1.5 rounded-xl border border-emerald-600/40 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                        title="Modificar los datos generales del sermón para todos los días de esta semana"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        <span>Editar Sermón Base</span>
+                      </button>
+
+                      <div className="bg-emerald-950/60 border border-emerald-700/40 px-3.5 py-1.5 rounded-xl shrink-0">
+                        <span className="text-xs font-bold text-emerald-200">
+                          {currentWeekDevotionals.length} de 7 días cargados
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Lista de Tarjetas de los 7 Días */}
+                {/* Lista de Tarjetas de los 7 Días con Edición Directa */}
                 {loadingDevocionales ? (
                   <div className="p-12 text-center">
                     <Loader className="w-8 h-8 animate-spin mx-auto text-emerald-500 mb-2" />
@@ -1590,16 +1669,21 @@ export default function Admin() {
                       No hay devocionales para la semana {selectedDevocionalSemana || ''}
                     </h4>
                     <p className="text-xs text-slate-500 max-w-md mx-auto">
-                      Puedes importar los 7 días generados por la IA pegando el texto directamente o subir el audio del sermón.
+                      Puedes sincronizar los archivos <code>.md</code> desde Supabase Storage o pegar el texto directamente.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setDevocionalSubTab('import')}
-                      className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>Importar Devocional con IA</span>
-                    </button>
+                    <div className="flex items-center justify-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDevocionalSubTab('storage')
+                          fetchStorageFiles(true)
+                        }}
+                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer"
+                      >
+                        <Cloud className="w-4 h-4" />
+                        <span>Sincronizar desde Storage (.md)</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1608,7 +1692,7 @@ export default function Admin() {
                       return (
                         <div
                           key={dev.id}
-                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-500/40 transition-colors"
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-500/50 transition-colors"
                         >
                           <div className="space-y-3">
                             {/* Cabecera de la tarjeta */}
@@ -1664,24 +1748,30 @@ export default function Admin() {
                             </div>
                           </div>
 
-                          {/* Botones de acción */}
-                          <div className="flex items-center justify-end gap-2 pt-4 mt-3 border-t border-slate-100 dark:border-slate-800">
-                            <button
-                              type="button"
-                              onClick={() => setEditingDevocional({ ...dev })}
-                              className="inline-flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 px-2.5 py-1.5 rounded-xl font-semibold transition-colors cursor-pointer"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                              <span>Editar</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteDevocional(dev.id)}
-                              className="inline-flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2.5 py-1.5 rounded-xl font-semibold transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Eliminar</span>
-                            </button>
+                          {/* Botones de acción (Modificar / Eliminar) */}
+                          <div className="flex items-center justify-between gap-2 pt-4 mt-3 border-t border-slate-100 dark:border-slate-800">
+                            <span className="text-[10px] text-slate-400">
+                              ID: #{dev.id}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setEditingDevocional({ ...dev })}
+                                className="inline-flex items-center gap-1.5 text-xs bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800/60"
+                                title="Modificar este devocional"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                                <span>Modificar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDevocional(dev.id)}
+                                className="inline-flex items-center gap-1 text-xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 p-1.5 rounded-xl transition-colors cursor-pointer"
+                                title="Eliminar devocional"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       )
@@ -1691,92 +1781,179 @@ export default function Admin() {
               </div>
             )}
 
-            {/* VISTA 2: IMPORTAR DESDE IA / MARKDOWN */}
-            {devocionalSubTab === 'import' && (
+            {/* VISTA 2: EXPLORADOR Y SINCRONIZADOR DE SUPABASE STORAGE (.MD) */}
+            {devocionalSubTab === 'storage' && (
               <div className="space-y-6">
-                <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <h4 className="text-sm font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-emerald-500" />
-                        <span>Pegar Devocional Semanal en Markdown</span>
+                      <h4 className="text-base font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
+                        <Cloud className="w-5 h-5 text-emerald-500" />
+                        <span>Sincronización desde Supabase Storage</span>
                       </h4>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Pega el texto estructurado entregado por n8n o tu IA. La app detectará automáticamente los 7 días, títulos, versículos y fechas.
+                      <p className="text-xs text-slate-500 mt-1">
+                        Bucket: <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{storageBucketName}</span>. La app consulta automáticamente si la IA o n8n subió nuevos archivos <code>.md</code>.
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const sampleMD = `# Devocional semanal IBVN · 06-09-2026\n\n---\n\n## Lunes · Día 1\n\n**Título:** Palabra fiel, llamado verdadero\n\n**Versículo:** «Palabra fiel es esta: si alguno aspira al cargo de obispo, buena obra desea hacer.» — *1 Timoteo 3:1 · LBLA*\n\n**Comentario:** Fíjate en la primera palabra: «fiel». Pablo no abre con una opinión; abre con un sello. Como el comerciante que pone su firma al pie de la balanza, el apóstol dice: lo que sigue es digno de confianza. Y luego aparecen dos verbos: aspirar y desear. Uno se ve por fuera, el esfuerzo; el otro arde por dentro, la pasión. Cuando Dios llama, planta ese fuego en el corazón. Nadie se hace pastor como quien elige un empleo. Es un llamado, no una meta personal. Y fíjate: el texto dice «buena obra», no «buen puesto». Si ves a alguien servir a la iglesia, no admires el cargo; mira la obra. Todo lo que viene esta semana descansa sobre una palabra fiel.\n\n**Gratitud:** ¿Qué hombre de Dios ha marcado tu vida?\n\n**Oración:** Señor, aviva en mí amor por tu obra.\n\n**Acción:** Lee 1 Timoteo 3:1-7 completo en voz alta.\n\n---\n\n## Martes · Día 2\n\n**Título:** Un pastor trabaja toda la semana\n\n**Versículo:** «Pero os rogamos, hermanos, que reconozcáis a los que con diligencia trabajan entre vosotros, y os dirigen en el Señor y os instruyen.» — *1 Tesalonicenses 5:12 · LBLA*\n\n**Comentario:** Mira los verbos que Pablo usa: «trabajan», «dirigen», «instruyen». Ninguno dice «descansan el lunes». Hubo un campesino en un pueblo chico, Juanano. Cada mañana abría el cerco y sacaba sus ovejas a pastar. Cada tarde las llamaba, y ellas reconocían su voz. Sabía dónde había buen pasto, cuándo debían beber, cuándo estaban enfermas. Así es el pastor: no solo habla el domingo; guía, alimenta, corrige y cuida toda la semana. Ese hombre del cerco no entretenía a sus ovejas; las mantenía vivas. Dirige, predica, enseña, protege. Su meta es edificarte con la Palabra. Hoy piensa en quienes te pastorean. ¿Los conoces? ¿Te conocen? Reconócelos, dice Pablo. Un pastor que trabaja toda la semana merece tu oración.\n\n**Gratitud:** ¿Quién te ha aconsejado con la Palabra?\n\n**Oración:** Padre, sostén a mis pastores en su trabajo.\n\n**Acción:** Envía un mensaje de ánimo a un pastor.`
-                        handleMarkdownChange(sampleMD)
-                      }}
-                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
-                    >
-                      Cargar texto de ejemplo
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fetchStorageFiles(true)}
+                        disabled={loadingStorage}
+                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${loadingStorage ? 'animate-spin' : ''}`} />
+                        <span>Buscar archivos nuevos</span>
+                      </button>
+                    </div>
                   </div>
 
-                  <textarea
-                    rows="12"
-                    value={rawMarkdownDevocional}
-                    onChange={(e) => handleMarkdownChange(e.target.value)}
-                    placeholder="# Devocional semanal IBVN · 06-09-2026&#10;&#10;---&#10;&#10;## Lunes · Día 1&#10;**Título:** Palabra fiel...&#10;**Versículo:** «...» — 1 Timoteo 3:1 · LBLA&#10;**Comentario:** ...&#10;**Gratitud:** ...&#10;**Oración:** ...&#10;**Acción:** ..."
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 leading-relaxed"
-                  />
+                  {/* Estado del Polling Automático */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs">
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span>Verificación automática periódica activa (cada 45s)</span>
+                      {lastStorageSync && (
+                        <span className="text-slate-400">· Última revisión: {lastStorageSync}</span>
+                      )}
+                    </div>
 
-                  {/* Previsualización en Tiempo Real */}
+                    {newFilesCount > 0 ? (
+                      <span className="bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold px-2.5 py-1 rounded-full text-[11px] border border-amber-300 dark:border-amber-800">
+                        ✨ {newFilesCount} archivo(s) nuevo(s) listo(s) para importar
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 text-[11px]">
+                        Todos los archivos coinciden con devocionales existentes
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Buscador de archivos en Storage */}
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Filtrar archivos .md por nombre o fecha..."
+                        value={searchStorageTerm}
+                        onChange={(e) => setSearchStorageTerm(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Lista de Archivos .md */}
+                  {loadingStorage ? (
+                    <div className="p-8 text-center">
+                      <Loader className="w-6 h-6 animate-spin mx-auto text-emerald-500 mb-2" />
+                      <p className="text-xs text-slate-500">Buscando archivos en Supabase Storage...</p>
+                    </div>
+                  ) : filteredStorageFiles.length === 0 ? (
+                    <div className="text-center p-8 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                      <FolderOpen className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        No se encontraron archivos en el bucket "{storageBucketName}"
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1 max-w-sm mx-auto">
+                        Cuando n8n o la IA genere el devocional y lo suba al bucket, aparecerá aquí automáticamente.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredStorageFiles.map((file) => {
+                        const isSelected = selectedStorageFile?.name === file.name
+                        const sizeKB = file.metadata?.size ? (file.metadata.size / 1024).toFixed(1) : null
+
+                        return (
+                          <div
+                            key={file.id || file.name}
+                            className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                              isSelected
+                                ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-500/50 ring-1 ring-emerald-500/30'
+                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-emerald-500/30'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                                <FileText className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <h5 className="text-xs font-bold text-slate-900 dark:text-white font-mono">
+                                  {file.name}
+                                </h5>
+                                <p className="text-[11px] text-slate-400">
+                                  {file.created_at ? new Date(file.created_at).toLocaleString() : 'Fecha desconocida'}
+                                  {sizeKB && ` · ${sizeKB} KB`}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleLoadStorageFile(file)}
+                              disabled={loadingFileContent && isSelected}
+                              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-xs cursor-pointer self-start sm:self-auto"
+                            >
+                              {loadingFileContent && isSelected ? (
+                                <Loader className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Download className="w-3.5 h-3.5" />
+                              )}
+                              <span>{isSelected ? 'Recargar y Previsualizar' : 'Cargar y Previsualizar'}</span>
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Panel de Previsualización e Importación del Archivo Seleccionado */}
                   {parsedWeeklyPreview && (
-                    <div className="bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-5 space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/80 dark:border-emerald-800/60 pb-3">
+                    <div className="bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 rounded-2xl p-5 space-y-4 animate-in fade-in duration-300">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-200 dark:border-emerald-800/80 pb-3">
                         <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                          <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
                             Semana {parsedWeeklyPreview.semana} Detectada
                           </span>
-                          <h5 className="text-sm font-bold text-slate-900 dark:text-white">
-                            {parsedWeeklyPreview.sermonTitulo} (Sermón: {parsedWeeklyPreview.sermonFecha})
-                          </h5>
+                          <h4 className="text-base font-bold font-serif text-slate-900 dark:text-white">
+                            {parsedWeeklyPreview.sermonTitulo}
+                          </h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-300">
+                            Fecha base: {parsedWeeklyPreview.sermonFecha} · {parsedWeeklyPreview.days.length} días estructurados
+                          </p>
                         </div>
 
-                        <div className="bg-emerald-600 text-white font-bold text-xs px-3 py-1 rounded-xl self-start sm:self-auto">
-                          {parsedWeeklyPreview.days.length} días detectados
-                        </div>
-                      </div>
-
-                      {/* Lista resumida de días detectados */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        {parsedWeeklyPreview.days.map((d) => (
-                          <div key={d.dia_numero} className="bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
-                            <span className="font-bold text-emerald-700 dark:text-emerald-400 block text-[11px]">
-                              {d.dia_nombre} (Día {d.dia_numero}) · {d.fecha_asignada}
-                            </span>
-                            <span className="font-medium text-slate-800 dark:text-slate-200 line-clamp-1">
-                              {d.titulo}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="pt-2 flex justify-end">
                         <button
                           type="button"
                           onClick={handlePublishWeeklyParsed}
                           disabled={loading || parsedWeeklyPreview.days.length === 0}
-                          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md text-xs cursor-pointer"
+                          className="inline-flex items-center gap-2 bg-[#183328] hover:bg-[#234b3b] text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-md cursor-pointer self-start sm:self-auto"
                         >
                           {loading ? (
-                            <>
-                              <Loader className="w-4 h-4 animate-spin" />
-                              <span>Publicando en Supabase...</span>
-                            </>
+                            <Loader className="w-4 h-4 animate-spin" />
                           ) : (
-                            <>
-                              <UploadCloud className="w-4 h-4" />
-                              <span>Publicar los {parsedWeeklyPreview.days.length} Devocionales de la Semana</span>
-                            </>
+                            <FileCheck className="w-4 h-4 text-emerald-400" />
                           )}
+                          <span>Importar los {parsedWeeklyPreview.days.length} Devocionales a la BD</span>
                         </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {parsedWeeklyPreview.days.map((d) => (
+                          <div key={d.dia_numero} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                            <span className="font-bold text-emerald-700 dark:text-emerald-400 block text-[11px]">
+                              {d.dia_nombre} (Día {d.dia_numero}) · {d.fecha_asignada}
+                            </span>
+                            <span className="font-semibold text-slate-900 dark:text-white block line-clamp-1">
+                              {d.titulo}
+                            </span>
+                            <span className="text-slate-500 text-[11px] italic line-clamp-1">
+                              {d.texto_biblico}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -1784,164 +1961,19 @@ export default function Admin() {
               </div>
             )}
 
-            {/* VISTA 3: CREAR MANUAL / AUDIO CON IA */}
-            {devocionalSubTab === 'manual' && (
-              <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-6">
-                {/* Módulo IA */}
-                <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl p-5">
-                  <h4 className="text-sm font-bold font-display text-indigo-900 dark:text-indigo-300 mb-2 flex items-center space-x-2">
-                    <Wand2 className="w-4 h-4" />
-                    <span>Generar desde Audio (IA)</span>
-                  </h4>
-                  <p className="text-xs text-indigo-700/70 dark:text-indigo-400/70 mb-4">
-                    Sube el audio del devocional y la inteligencia artificial lo transcribirá y redactará el borrador por ti.
-                  </p>
-
-                  {iaError && (
-                    <div className="flex items-center space-x-2 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 p-3 rounded-lg text-xs mb-4">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>{iaError}</span>
-                    </div>
-                  )}
-
-                  {iaStatus && (
-                    <div className="flex items-center space-x-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 p-3 rounded-lg text-xs mb-4">
-                      <CheckCircle className="w-4 h-4 shrink-0" />
-                      <span>{iaStatus}</span>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                    <input
-                      id="audio_upload_input"
-                      type="file"
-                      accept="audio/*"
-                      onChange={(e) => setAudioFile(e.target.files[0])}
-                      className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/50 dark:file:text-indigo-300"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleGenerateIA}
-                      disabled={isGeneratingIA || !audioFile}
-                      className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-medium py-2 px-4 rounded-xl transition-all disabled:opacity-50 text-xs shadow-sm cursor-pointer"
-                    >
-                      {isGeneratingIA ? (
-                        <Loader className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <UploadCloud className="w-4 h-4" />
-                      )}
-                      <span>{isGeneratingIA ? 'Generando...' : 'Generar Borrador'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Formulario Manual de 1 Devocional */}
-                <form onSubmit={handleCreateDevotional} className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                    <div>
-                      <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                        Semana del Año
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        value={semana}
-                        onChange={(e) => setSemana(e.target.value)}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                        Título del Devocional
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={titulo}
-                        onChange={(e) => setTitulo(e.target.value)}
-                        placeholder="La Fidelidad en el Desierto"
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                      Texto Bíblico Clave (LBLA)
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={textoBiblico}
-                      onChange={(e) => setTextoBiblico(e.target.value)}
-                      placeholder="Génesis 15:6"
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                      Reflexión Pastoral
-                    </label>
-                    <textarea
-                      rows="6"
-                      required
-                      value={reflexion}
-                      onChange={(e) => setReflexion(e.target.value)}
-                      placeholder="Escribe la reflexión del devocional aquí..."
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm leading-relaxed"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                      Oración de Cierre / Guía
-                    </label>
-                    <textarea
-                      rows="3"
-                      required
-                      value={oracion}
-                      onChange={(e) => setOracion(e.target.value)}
-                      placeholder="Señor Jesús, te pedimos..."
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 text-sm leading-relaxed"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 text-sm font-display cursor-pointer"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader className="w-4 h-4 animate-spin" />
-                        <span>Publicando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <PlusCircle className="w-4 h-4" />
-                        <span>Publicar Devocional Individual</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {/* MODAL DE EDICIÓN DE UN DEVOCIONAL INDIVIDUAL */}
+            {/* MODAL 1: MODIFICACIÓN PASTORAL DE UN DEVOCIONAL INDIVIDUAL */}
             {editingDevocional && (
               <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-                <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-5 my-8">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-5 my-8 animate-in fade-in zoom-in-95 duration-200">
                   <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                     <h4 className="text-base font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
                       <Edit2 className="w-4 h-4 text-emerald-500" />
-                      <span>Editar Devocional: {editingDevocional.dia_nombre || `Día ${editingDevocional.dia_numero || ''}`}</span>
+                      <span>Modificar Devocional: {editingDevocional.dia_nombre || `Día ${editingDevocional.dia_numero || ''}`}</span>
                     </h4>
                     <button
                       type="button"
                       onClick={() => setEditingDevocional(null)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
                     >
                       <X className="w-5 h-5" />
                     </button>
@@ -2050,7 +2082,7 @@ export default function Admin() {
                       <button
                         type="button"
                         onClick={() => setEditingDevocional(null)}
-                        className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                        className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 cursor-pointer"
                       >
                         Cancelar
                       </button>
@@ -2059,7 +2091,110 @@ export default function Admin() {
                         disabled={loading}
                         className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-sm transition-all cursor-pointer"
                       >
-                        {loading ? 'Guardando...' : 'Guardar Cambios'}
+                        {loading ? 'Guardando...' : 'Guardar Corrección'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL 2: EDICIÓN GENERAL DEL SERMÓN BASE DE LA SEMANA */}
+            {editingWeekInfo && (
+              <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-5 my-8 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                    <h4 className="text-base font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
+                      <Edit2 className="w-4 h-4 text-emerald-500" />
+                      <span>Editar Sermón Base · Semana {editingWeekInfo.semana}</span>
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setEditingWeekInfo(null)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveWeekSermonInfo} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                        Título del Sermón
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editingWeekInfo.sermon_titulo}
+                        onChange={(e) => setEditingWeekInfo({ ...editingWeekInfo, sermon_titulo: e.target.value })}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-semibold"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Predicador
+                        </label>
+                        <input
+                          type="text"
+                          value={editingWeekInfo.sermon_predicador}
+                          onChange={(e) => setEditingWeekInfo({ ...editingWeekInfo, sermon_predicador: e.target.value })}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Fecha del Sermón
+                        </label>
+                        <input
+                          type="date"
+                          value={editingWeekInfo.sermon_fecha}
+                          onChange={(e) => setEditingWeekInfo({ ...editingWeekInfo, sermon_fecha: e.target.value })}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Pasaje Bíblico Base
+                        </label>
+                        <input
+                          type="text"
+                          value={editingWeekInfo.sermon_texto_base}
+                          onChange={(e) => setEditingWeekInfo({ ...editingWeekInfo, sermon_texto_base: e.target.value })}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Versión Bíblica
+                        </label>
+                        <input
+                          type="text"
+                          value={editingWeekInfo.sermon_version}
+                          onChange={(e) => setEditingWeekInfo({ ...editingWeekInfo, sermon_version: e.target.value })}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setEditingWeekInfo(null)}
+                        className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-sm transition-all cursor-pointer"
+                      >
+                        {loading ? 'Guardando...' : 'Aplicar a toda la semana'}
                       </button>
                     </div>
                   </form>
@@ -3557,12 +3692,13 @@ export default function Admin() {
                   <input type="text" value={settingsForm.name || ''} onChange={e => setSettingsForm({ ...settingsForm, name: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" required />
                 </div>
                 <div className="md:col-span-2 flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-500/5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 mb-2">
-                  <div className="relative w-20 h-20 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
-                    {settingsForm.logo_url ? (
-                      <img src={settingsForm.logo_url} alt="Logo" className="w-full h-full object-cover" />
-                    ) : (
-                      <UploadCloud className="w-8 h-8 text-slate-400" />
-                    )}
+                  <div className="relative w-20 h-20 rounded-2xl bg-slate-900 border border-slate-700/50 flex items-center justify-center overflow-hidden shrink-0 shadow-sm p-1">
+                    <img 
+                      src={settingsForm.logo_url || defaultLogo} 
+                      alt="Logo" 
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = defaultLogo; }}
+                      className="w-full h-full object-contain" 
+                    />
                     {uploadingLogo && (
                       <div className="absolute inset-0 bg-slate-950/60 flex items-center justify-center">
                         <Loader className="w-5 h-5 text-indigo-400 animate-spin" />
