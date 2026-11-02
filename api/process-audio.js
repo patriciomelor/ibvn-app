@@ -2,14 +2,26 @@ import { OpenAI, toFile } from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 
-// Inicializar clientes
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// El cliente de Supabase necesita la Service Role Key para descargar sin RLS
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+// Los clientes se crean dentro del handler: si falta una API key, el SDK de OpenAI
+// lanza una excepción al instanciarse y, si eso ocurre al cargar el módulo, Vercel
+// responde FUNCTION_INVOCATION_FAILED (HTML) en lugar de un JSON con el error.
+function getClients() {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const missing = [];
+  if (!process.env.OPENAI_API_KEY) missing.push('OPENAI_API_KEY');
+  if (!process.env.ANTHROPIC_API_KEY) missing.push('ANTHROPIC_API_KEY');
+  if (!supabaseUrl) missing.push('VITE_SUPABASE_URL');
+  // El cliente de Supabase necesita la Service Role Key para descargar sin RLS
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (missing.length) {
+    throw new Error(`Faltan variables de entorno en Vercel: ${missing.join(', ')}`);
+  }
+  return {
+    openai: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }),
+    anthropic: new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }),
+    supabase: createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY),
+  };
+}
 
 export default async function handler(req, res) {
   // CORS setup
@@ -32,9 +44,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'filePath es requerido' });
     }
 
-    if (!supabase) {
-      return res.status(500).json({ error: 'Supabase Service Client no configurado en Vercel' });
-    }
+    const { openai, anthropic, supabase } = getClients();
 
     // 1. Descargar audio de Supabase Storage
     console.log(`Descargando ${filePath} desde Supabase...`);
@@ -104,7 +114,7 @@ ${transcription}
 `;
 
     const claudeResponse = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-5',
       max_tokens: 2500,
       temperature: 0.3,
       messages: [{ role: 'user', content: prompt }]

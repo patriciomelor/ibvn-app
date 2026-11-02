@@ -22,6 +22,13 @@ import {
 } from 'lucide-react'
 
 // Ilustración SVG del árbol de Salmo 1:3 para la portada estilo libro de bolsillo
+const cleanDisplayText = (text) => {
+  if (!text) return ''
+  return String(text)
+    .replace(/^\s*(?:\*{1,2})?(?:Título|Versículo|Comentario|Gratitud|Oración|Acción)(?:\*{1,2})?:(?:\*{1,2})?\s*/i, '')
+    .trim()
+}
+
 const TreeIllustration = ({ className = "w-48 h-48 mx-auto" }) => (
   <svg 
     viewBox="0 0 300 320" 
@@ -547,7 +554,12 @@ ${currentDevocional.sermon_titulo ? `Sermón: «${currentDevocional.sermon_titul
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
           <div className="relative z-10 max-w-lg mx-auto space-y-6">
-            <div>
+            <div className="flex flex-col items-center">
+              <img 
+                src="/logo-ibvn.png" 
+                alt="Logo IBVN" 
+                className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md mb-3" 
+              />
               <p className="text-[11px] font-semibold tracking-[0.25em] text-emerald-200/80 uppercase">
                 Iglesia Bautista Vida Nueva
               </p>
@@ -626,20 +638,20 @@ ${currentDevocional.sermon_titulo ? `Sermón: «${currentDevocional.sermon_titul
             {/* Título del Día (máximo 7 palabras) */}
             <div className="space-y-3 mb-6">
               <h2 className="text-2xl sm:text-3xl font-bold font-serif text-[#183328] dark:text-emerald-100 leading-tight">
-                {currentDevocional.titulo}
+                {cleanDisplayText(currentDevocional.titulo)}
               </h2>
 
               {/* Texto Bíblico con Referencia */}
               <div className="border-l-3 border-[#2d5e46] pl-4 py-1">
                 <p className="text-base sm:text-lg text-slate-700 dark:text-slate-200 italic font-serif leading-relaxed">
-                  {currentDevocional.texto_biblico}
+                  {cleanDisplayText(currentDevocional.texto_biblico)}
                 </p>
               </div>
             </div>
 
             {/* Comentario Pastoral al estilo Spurgeon (110-130 palabras) */}
             <div className="text-slate-800 dark:text-slate-200 leading-relaxed text-sm sm:text-base text-justify whitespace-pre-line mb-8 font-sans">
-              {currentDevocional.reflexion}
+              {cleanDisplayText(currentDevocional.reflexion)}
             </div>
 
             {/* Divisor ornamental de arroyos de aguas */}
@@ -659,7 +671,7 @@ ${currentDevocional.sermon_titulo ? `Sermón: «${currentDevocional.sermon_titul
                     Gratitud
                   </span>
                   <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">
-                    {currentDevocional.gratitud_pregunta || '¿Dónde viste hoy la fidelidad de Dios?'}
+                    {cleanDisplayText(currentDevocional.gratitud_pregunta) || '¿Dónde viste hoy la fidelidad de Dios?'}
                   </span>
                 </div>
 
@@ -693,7 +705,7 @@ ${currentDevocional.sermon_titulo ? `Sermón: «${currentDevocional.sermon_titul
                     Oración
                   </span>
                   <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">
-                    {currentDevocional.oracion || 'Por las necesidades de tu prójimo y tu corazón'}
+                    {cleanDisplayText(currentDevocional.oracion) || 'Por las necesidades de tu prójimo y tu corazón'}
                   </span>
                 </div>
 
@@ -716,7 +728,7 @@ ${currentDevocional.sermon_titulo ? `Sermón: «${currentDevocional.sermon_titul
                     Acción de hoy
                   </span>
                   <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">
-                    {currentDevocional.accion || 'Un paso pequeño y concreto para hoy'}
+                    {cleanDisplayText(currentDevocional.accion) || 'Un paso pequeño y concreto para hoy'}
                   </span>
                 </div>
 
