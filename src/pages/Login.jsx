@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Lock, Mail, ShieldAlert, Eye, EyeOff } from 'lucide-react'
+import defaultLogo from '../assets/logo-ibvn.png'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -38,8 +39,9 @@ export default function Login() {
         {/* Cabecera / Logo */}
         <div className="flex flex-col items-center mb-8">
           <img 
-            src={churchSettings?.logo_url || "/logo-ibvn.png"} 
+            src={churchSettings?.logo_url || defaultLogo} 
             alt="Logo" 
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = defaultLogo; }}
             className="w-20 h-20 rounded-2xl shadow-xl border border-slate-700/40 bg-slate-900 mb-4 transform hover:scale-105 transition-transform object-contain p-2" 
           />
           <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white tracking-tight">

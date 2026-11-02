@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { BookOpen, UserCheck, ShieldAlert, Award, Save, PlusCircle, Search, Edit2, Loader, CheckCircle, AlertCircle, FileSpreadsheet, Activity, ChevronRight, MessageSquare, Trash2, CheckSquare, FileText, Calendar, ExternalLink, Users, Settings, Mic, Wand2, UploadCloud, Camera, Globe, Send, Lock, Building, Star, X, Flame, List, Copy, Eye, Clock, Sparkles, RefreshCw, Cloud, Download, CheckCircle2, FolderOpen, FileCheck } from 'lucide-react'
 import { sendWhatsAppMessage, notifySubscribersAboutDevocional, notifySubscribersAboutResource } from '../lib/whatsapp'
 import { parseDevocionalSemanal, getWeekNumber } from '../lib/devocionalParser'
+import defaultLogo from '../assets/logo-ibvn.png'
 
 export default function Admin() {
   const { user, isPastorAdmin, moduleVisibility, refreshVisibility } = useAuth()
@@ -23,7 +24,7 @@ export default function Admin() {
   const [adminDevocionales, setAdminDevocionales] = useState([])
   const [loadingDevocionales, setLoadingDevocionales] = useState(false)
   const [selectedDevocionalSemana, setSelectedDevocionalSemana] = useState(null)
-  const [devocionalSubTab, setDevocionalSubTab] = useState('list') // 'list', 'storage', 'markdown', 'manual'
+  const [devocionalSubTab, setDevocionalSubTab] = useState('list') // 'list', 'storage'
   const [rawMarkdownDevocional, setRawMarkdownDevocional] = useState('')
   const [parsedWeeklyPreview, setParsedWeeklyPreview] = useState(null)
   const [editingDevocional, setEditingDevocional] = useState(null)
@@ -952,18 +953,6 @@ export default function Admin() {
     }
   }
 
-  // Parsear texto Markdown en tiempo real al escribir o pegar
-  const handleMarkdownChange = (text) => {
-    setRawMarkdownDevocional(text)
-    if (text.trim().length > 30) {
-      const parsed = parseDevocionalSemanal(text)
-      setParsedWeeklyPreview(parsed)
-      if (parsed.semana) setSemana(parsed.semana)
-    } else {
-      setParsedWeeklyPreview(null)
-    }
-  }
-
   // Publicar devocional semanal completo (7 días) parseado
   const handlePublishWeeklyParsed = async () => {
     if (!parsedWeeklyPreview || !parsedWeeklyPreview.days || parsedWeeklyPreview.days.length === 0) {
@@ -1551,19 +1540,6 @@ export default function Admin() {
                     <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-amber-400/30 animate-pulse"></span>
                   )}
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDevocionalSubTab('markdown')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    devocionalSubTab === 'markdown'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Pegar Markdown</span>
-                </button>
               </div>
             </div>
 
@@ -1705,15 +1681,7 @@ export default function Admin() {
                         className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer"
                       >
                         <Cloud className="w-4 h-4" />
-                        <span>Buscar en Storage (.md)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDevocionalSubTab('markdown')}
-                        className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                        <span>Pegar Markdown</span>
+                        <span>Sincronizar desde Storage (.md)</span>
                       </button>
                     </div>
                   </div>
@@ -1986,97 +1954,6 @@ export default function Admin() {
                             </span>
                           </div>
                         ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* VISTA 3: PEGAR MARKDOWN MANUAL */}
-            {devocionalSubTab === 'markdown' && (
-              <div className="space-y-6">
-                <div className="glass rounded-3xl p-6 border border-slate-200 dark:border-slate-850 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-emerald-500" />
-                        <span>Pegar Devocional Semanal en Markdown</span>
-                      </h4>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Pega el texto estructurado si deseas ingresar o probar un devocional directamente sin pasar por Storage.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const sampleMD = `# Devocional semanal IBVN · 06-09-2026\n\n---\n\n## Lunes · Día 1\n\n**Título:** Palabra fiel, llamado verdadero\n\n**Versículo:** «Palabra fiel es esta: si alguno aspira al cargo de obispo, buena obra desea hacer.» — *1 Timoteo 3:1 · LBLA*\n\n**Comentario:** Fíjate en la primera palabra: «fiel». Pablo no abre con una opinión; abre con un sello. Como el comerciante que pone su firma al pie de la balanza, el apóstol dice: lo que sigue es digno de confianza. Y luego aparecen dos verbos: aspirar y desear. Uno se ve por fuera, el esfuerzo; el otro arde por dentro, la pasión. Cuando Dios llama, planta ese fuego en el corazón. Nadie se hace pastor como quien elige un empleo. Es un llamado, no una meta personal. Y fíjate: el texto dice «buena obra», no «buen puesto». Si ves a alguien servir a la iglesia, no admires el cargo; mira la obra. Todo lo que viene esta semana descansa sobre una palabra fiel.\n\n**Gratitud:** ¿Qué hombre de Dios ha marcado tu vida?\n\n**Oración:** Señor, aviva en mí amor por tu obra.\n\n**Acción:** Lee 1 Timoteo 3:1-7 completo en voz alta.\n\n---\n\n## Martes · Día 2\n\n**Título:** Un pastor trabaja toda la semana\n\n**Versículo:** «Pero os rogamos, hermanos, que reconozcáis a los que con diligencia trabajan entre vosotros, y os dirigen en el Señor y os instruyen.» — *1 Tesalonicenses 5:12 · LBLA*\n\n**Comentario:** Mira los verbos que Pablo usa: «trabajan», «dirigen», «instruyen». Ninguno dice «descansan el lunes». Hubo un campesino en un pueblo chico, Juanano. Cada mañana abría el cerco y sacaba sus ovejas a pastar. Cada tarde las llamaba, y ellas reconocían su voz. Sabía dónde había buen pasto, cuándo debían beber, cuándo estaban enfermas. Así es el pastor: no solo habla el domingo; guía, alimenta, corrige y cuida toda la semana. Ese hombre del cerco no entretenía a sus ovejas; las mantenía vivas. Dirige, predica, enseña, protege. Su meta es edificarte con la Palabra. Hoy piensa en quienes te pastorean. ¿Los conoces? ¿Te conocen? Reconócelos, dice Pablo. Un pastor que trabaja toda la semana merece tu oración.\n\n**Gratitud:** ¿Quién te ha aconsejado con la Palabra?\n\n**Oración:** Padre, sostén a mis pastores en su trabajo.\n\n**Acción:** Envía un mensaje de ánimo a un pastor.`
-                        handleMarkdownChange(sampleMD)
-                      }}
-                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold cursor-pointer"
-                    >
-                      Cargar texto de ejemplo
-                    </button>
-                  </div>
-
-                  <textarea
-                    rows="12"
-                    value={rawMarkdownDevocional}
-                    onChange={(e) => handleMarkdownChange(e.target.value)}
-                    placeholder="# Devocional semanal IBVN · 06-09-2026&#10;&#10;---&#10;&#10;## Lunes · Día 1&#10;**Título:** Palabra fiel...&#10;**Versículo:** «...» — 1 Timoteo 3:1 · LBLA&#10;**Comentario:** ...&#10;**Gratitud:** ...&#10;**Oración:** ...&#10;**Acción:** ..."
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl p-4 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 leading-relaxed"
-                  />
-
-                  {parsedWeeklyPreview && (
-                    <div className="bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-5 space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/80 dark:border-emerald-800/60 pb-3">
-                        <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                            Semana {parsedWeeklyPreview.semana} Detectada
-                          </span>
-                          <h5 className="text-sm font-bold text-slate-900 dark:text-white">
-                            {parsedWeeklyPreview.sermonTitulo} (Sermón: {parsedWeeklyPreview.sermonFecha})
-                          </h5>
-                        </div>
-
-                        <div className="bg-emerald-600 text-white font-bold text-xs px-3 py-1 rounded-xl self-start sm:self-auto">
-                          {parsedWeeklyPreview.days.length} días detectados
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        {parsedWeeklyPreview.days.map((d) => (
-                          <div key={d.dia_numero} className="bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
-                            <span className="font-bold text-emerald-700 dark:text-emerald-400 block text-[11px]">
-                              {d.dia_nombre} (Día {d.dia_numero}) · {d.fecha_asignada}
-                            </span>
-                            <span className="font-medium text-slate-800 dark:text-slate-200 line-clamp-1">
-                              {d.titulo}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="pt-2 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={handlePublishWeeklyParsed}
-                          disabled={loading || parsedWeeklyPreview.days.length === 0}
-                          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md text-xs cursor-pointer"
-                        >
-                          {loading ? (
-                            <>
-                              <Loader className="w-4 h-4 animate-spin" />
-                              <span>Publicando en Supabase...</span>
-                            </>
-                          ) : (
-                            <>
-                              <UploadCloud className="w-4 h-4" />
-                              <span>Publicar los {parsedWeeklyPreview.days.length} Devocionales de la Semana</span>
-                            </>
-                          )}
-                        </button>
                       </div>
                     </div>
                   )}
@@ -3815,12 +3692,13 @@ export default function Admin() {
                   <input type="text" value={settingsForm.name || ''} onChange={e => setSettingsForm({ ...settingsForm, name: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200" required />
                 </div>
                 <div className="md:col-span-2 flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-500/5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 mb-2">
-                  <div className="relative w-20 h-20 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
-                    {settingsForm.logo_url ? (
-                      <img src={settingsForm.logo_url} alt="Logo" className="w-full h-full object-cover" />
-                    ) : (
-                      <UploadCloud className="w-8 h-8 text-slate-400" />
-                    )}
+                  <div className="relative w-20 h-20 rounded-2xl bg-slate-900 border border-slate-700/50 flex items-center justify-center overflow-hidden shrink-0 shadow-sm p-1">
+                    <img 
+                      src={settingsForm.logo_url || defaultLogo} 
+                      alt="Logo" 
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = defaultLogo; }}
+                      className="w-full h-full object-contain" 
+                    />
                     {uploadingLogo && (
                       <div className="absolute inset-0 bg-slate-950/60 flex items-center justify-center">
                         <Loader className="w-5 h-5 text-indigo-400 animate-spin" />

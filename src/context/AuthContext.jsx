@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
         // Fallback
         setChurchSettings({
           name: 'Vida Nueva',
-          logo_url: null,
+          logo_url: '/logo-ibvn.png',
           address: 'Santiago, Chile',
           phone: '',
           email: '',
@@ -139,7 +139,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     // 2. Favicon & Apple Icon
-    const iconUrl = settings.logo_url || '/favicon.png'
+    const iconUrl = settings?.logo_url || '/logo-ibvn.png'
     const favicon = document.querySelector('link[rel="icon"]')
     if (favicon) favicon.setAttribute('href', iconUrl)
 

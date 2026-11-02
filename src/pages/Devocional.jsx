@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import defaultLogo from '../assets/logo-ibvn.png'
 import { 
   BookOpen, 
   Calendar, 
@@ -558,6 +559,7 @@ ${currentDevocional.sermon_titulo ? `Sermón: «${currentDevocional.sermon_titul
               <img 
                 src="/logo-ibvn.png" 
                 alt="Logo IBVN" 
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = defaultLogo; }}
                 className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md mb-3" 
               />
               <p className="text-[11px] font-semibold tracking-[0.25em] text-emerald-200/80 uppercase">
