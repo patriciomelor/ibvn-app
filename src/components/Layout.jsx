@@ -111,7 +111,7 @@ export default function Layout({ children }) {
       <aside className="hidden md:flex md:w-64 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shrink-0 sticky top-0 h-screen p-5">
         {/* Header Logo */}
         <div className="flex items-center space-x-3 mb-8 px-2">
-          <img src={churchSettings?.logo_url || "/favicon.png"} alt="Logo Iglesia" className="w-10 h-10 rounded-xl shadow-lg border border-indigo-500/20 object-cover" />
+          <img src={churchSettings?.logo_url || "/logo-ibvn.png"} alt="Logo Iglesia" className="w-10 h-10 rounded-xl shadow-lg border border-slate-700/40 bg-slate-900 object-contain p-1" />
           <div>
             <h1 className="text-lg font-bold font-display tracking-tight text-slate-900 dark:text-white m-0 leading-tight">{churchSettings?.name || 'Vida Nueva'}</h1>
             <span className="text-xs text-indigo-400 font-medium">{churchSettings?.address || 'Santiago, Chile'}</span>
@@ -194,7 +194,7 @@ export default function Layout({ children }) {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <img src={churchSettings?.logo_url || "/favicon.png"} alt="Logo" className="w-8 h-8 rounded-lg shadow-sm border border-indigo-500/20 object-cover shrink-0" />
+          <img src={churchSettings?.logo_url || "/logo-ibvn.png"} alt="Logo" className="w-8 h-8 rounded-lg shadow-sm border border-slate-700/40 bg-slate-900 object-contain p-0.5 shrink-0" />
           <h1 className="text-sm font-bold font-display tracking-tight text-slate-900 dark:text-white truncate">{churchSettings?.name || 'Vida Nueva'}</h1>
         </div>
 
@@ -261,7 +261,7 @@ export default function Layout({ children }) {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
-                <img src={churchSettings?.logo_url || "/favicon.png"} alt="Logo" className="w-9 h-9 rounded-xl shadow-lg border border-indigo-500/20 object-cover" />
+                <img src={churchSettings?.logo_url || "/logo-ibvn.png"} alt="Logo" className="w-9 h-9 rounded-xl shadow-lg border border-slate-700/40 bg-slate-900 object-contain p-1" />
                 <div>
                   <h1 className="text-base font-bold font-display tracking-tight text-slate-900 dark:text-white m-0 leading-tight">{churchSettings?.name || 'Vida Nueva'}</h1>
                   <span className="text-[10px] text-indigo-400 font-medium">{churchSettings?.address || 'Santiago, Chile'}</span>
